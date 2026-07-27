@@ -1,0 +1,116 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Design Token Colors */
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --color-border-muted: var(--border-muted);
+
+  /* Design Token Fonts */
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-metadata);
+
+  /* shadcn/ui Custom Theme Overrides */
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--ink);
+  --color-primary-foreground: var(--surface);
+  --color-secondary: var(--background);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--background);
+  --color-muted-foreground: #6b7280;
+  --color-accent-foreground: var(--ink);
+  --color-border: var(--border-muted);
+  --color-input: var(--border-muted);
+  --color-ring: var(--primary);
+
+  /* Radii mapping */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* Theme tokens based on the design system */
+  --background: #F5F6F4;
+  --surface: #FFFFFF;
+  --ink: #14171A;
+  --primary: #2F5233;
+  --accent: #E8A33D;
+  --border-muted: #DADDD8;
+  --radius: 0.5rem;
+}
+
+body {
+  background: var(--background);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+@layer base {
+  * {
+    @apply border-border-muted outline-none;
+  }
+  input, textarea, select {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all;
+  }
+  body {
+    @apply bg-background text-ink;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* Restrained motion keyframes (< 250ms) */
+@keyframes popScale {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-pop {
+  animation: popScale 200ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.animate-modal-in {
+  animation: modalIn 180ms ease-out forwards;
+}
+
+.animate-backdrop-in {
+  animation: backdropFadeIn 180ms ease-out forwards;
+}
+
+/* Accessibility: Disable all motion if OS prefers-reduced-motion is active */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: campuscircle-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    region: oregon
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: campuscircle-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://campuscircle.vercel.app
+
+databases:
+  - name: campuscircle-db
+    databaseName: campuscircle
+    user: campuscircle
+    plan: free
