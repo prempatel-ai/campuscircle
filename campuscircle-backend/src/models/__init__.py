@@ -12,6 +12,8 @@ from src.models.comment import Comment
 from src.models.vote import Vote
 from src.models.report import Report, AuditLog
 from src.models.refresh_token import RefreshToken
+from src.models.notification import Notification
+from src.models.bookmark import Bookmark
 
 __all__ = [
     "University",
@@ -23,4 +25,6 @@ __all__ = [
     "Report",
     "AuditLog",
     "RefreshToken",
+    "Notification",
+    "Bookmark",
 ]

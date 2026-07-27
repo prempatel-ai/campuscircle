@@ -275,3 +275,223 @@ async def get_thread_posts(
         )
         for row in rows
     ]
+
+
+async def get_user_posts(
+    db: AsyncSession,
+    author_id: uuid.UUID,
+    page: int = 1,
+    size: int = 20
+) -> Tuple[List[EnrichedPost], int]:
+    """
+    Retrieve a paginated list of active posts created by a specific user.
+    Threaded posts appear ONCE in the list, representing part 1 (root post).
+    Excludes soft-deleted posts.
+    """
+    from sqlalchemy import or_
+
+    if page < 1:
+        page = 1
+    if size < 1:
+        size = 20
+
+    comment_count_col = _comment_count_subquery(Post.id)
+    thread_total_col = _thread_total_parts_subquery(Post.thread_id)
+
+    base_query = (
+        select(
+            Post,
+            User.username.label("author_username"),
+            comment_count_col.label("comment_count"),
+            func.coalesce(thread_total_col, 1).label("thread_total_parts")
+        )
+        .join(User, User.id == Post.author_id)
+        .where(
+            Post.author_id == author_id,
+            Post.is_deleted == False,
+            or_(Post.thread_position == 1, Post.thread_position.is_(None))
+        )
+    )
+
+    count_stmt = select(func.count(Post.id)).where(
+        Post.author_id == author_id,
+        Post.is_deleted == False,
+        or_(Post.thread_position == 1, Post.thread_position.is_(None))
+    )
+    count_result = await db.execute(count_stmt)
+    total_count = count_result.scalar_one() or 0
+
+    query = base_query.order_by(Post.created_at.desc()).offset((page - 1) * size).limit(size)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    enriched = [
+        EnrichedPost(
+            post=row[0],
+            author_username=row[1],
+            comment_count=row[2],
+            thread_total_parts=row[3] or 1
+        )
+        for row in rows
+    ]
+
+    return enriched, total_count
+
+
+async def search_posts(
+    db: AsyncSession,
+    community_id: uuid.UUID,
+    query_str: str,
+    page: int = 1,
+    size: int = 20
+) -> Tuple[List[EnrichedPost], int]:
+    """
+    Search active posts in a community by title/content using Postgres full-text search.
+    Results are ranked by relevance (ts_rank). Threaded posts appear ONCE (part 1).
+    Excludes soft-deleted posts.
+    """
+    from sqlalchemy import or_
+
+    if page < 1:
+        page = 1
+    if size < 1:
+        size = 20
+
+    ts_query = func.websearch_to_tsquery('english', query_str.strip())
+    rank_expr = func.ts_rank(Post.search_vector, ts_query)
+
+    comment_count_col = _comment_count_subquery(Post.id)
+    thread_total_col = _thread_total_parts_subquery(Post.thread_id)
+
+    base_query = (
+        select(
+            Post,
+            User.username.label("author_username"),
+            comment_count_col.label("comment_count"),
+            func.coalesce(thread_total_col, 1).label("thread_total_parts")
+        )
+        .join(User, User.id == Post.author_id)
+        .where(
+            Post.community_id == community_id,
+            Post.is_deleted == False,
+            Post.search_vector.op("@@")(ts_query),
+            or_(Post.thread_position == 1, Post.thread_position.is_(None))
+        )
+    )
+
+    count_stmt = select(func.count(Post.id)).where(
+        Post.community_id == community_id,
+        Post.is_deleted == False,
+        Post.search_vector.op("@@")(ts_query),
+        or_(Post.thread_position == 1, Post.thread_position.is_(None))
+    )
+    count_result = await db.execute(count_stmt)
+    total_count = count_result.scalar_one() or 0
+
+    query = base_query.order_by(rank_expr.desc(), Post.created_at.desc()).offset((page - 1) * size).limit(size)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    enriched = [
+        EnrichedPost(
+            post=row[0],
+            author_username=row[1],
+            comment_count=row[2],
+            thread_total_parts=row[3] or 1
+        )
+        for row in rows
+    ]
+
+    return enriched, total_count
+
+
+async def toggle_bookmark(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    post_id: uuid.UUID
+) -> bool:
+    """
+    Toggles bookmark status for a post by a user.
+    Returns True if bookmarked, False if unbookmarked.
+    """
+    from src.models.bookmark import Bookmark
+
+    stmt = select(Bookmark).where(Bookmark.user_id == user_id, Bookmark.post_id == post_id)
+    res = await db.execute(stmt)
+    existing = res.scalar_one_or_none()
+
+    if existing:
+        await db.delete(existing)
+        await db.flush()
+        await db.commit()
+        return False
+    else:
+        new_bm = Bookmark(user_id=user_id, post_id=post_id)
+        db.add(new_bm)
+        await db.flush()
+        await db.commit()
+        return True
+
+
+async def get_saved_posts(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    page: int = 1,
+    size: int = 20
+) -> Tuple[List[EnrichedPost], int]:
+    """
+    Retrieve paginated list of active posts bookmarked by user.
+    """
+    from sqlalchemy import or_
+    from src.models.bookmark import Bookmark
+
+    if page < 1:
+        page = 1
+    if size < 1:
+        size = 20
+
+    comment_count_col = _comment_count_subquery(Post.id)
+    thread_total_col = _thread_total_parts_subquery(Post.thread_id)
+
+    base_query = (
+        select(
+            Post,
+            User.username.label("author_username"),
+            comment_count_col.label("comment_count"),
+            func.coalesce(thread_total_col, 1).label("thread_total_parts")
+        )
+        .join(Bookmark, Bookmark.post_id == Post.id)
+        .join(User, User.id == Post.author_id)
+        .where(
+            Bookmark.user_id == user_id,
+            Post.is_deleted == False,
+            or_(Post.thread_position == 1, Post.thread_position.is_(None))
+        )
+    )
+
+    count_stmt = select(func.count(Post.id)).join(Bookmark, Bookmark.post_id == Post.id).where(
+        Bookmark.user_id == user_id,
+        Post.is_deleted == False,
+        or_(Post.thread_position == 1, Post.thread_position.is_(None))
+    )
+    count_res = await db.execute(count_stmt)
+    total_count = count_res.scalar_one() or 0
+
+    query = base_query.order_by(Bookmark.created_at.desc()).offset((page - 1) * size).limit(size)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    enriched = [
+        EnrichedPost(
+            post=row[0],
+            author_username=row[1],
+            comment_count=row[2],
+            thread_total_parts=row[3] or 1
+        )
+        for row in rows
+    ]
+
+    return enriched, total_count

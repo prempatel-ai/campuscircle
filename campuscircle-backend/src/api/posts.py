@@ -16,7 +16,9 @@ from src.repositories.post_repository import (
     create_thread,
     get_posts,
     get_post_by_id,
-    get_thread_posts
+    get_thread_posts,
+    search_posts,
+    toggle_bookmark
 )
 
 router = APIRouter(prefix="/communities", tags=["posts"])
@@ -247,6 +249,80 @@ async def list_community_posts(
         db=db,
         community_id=community_uuid,
         sort=sort,
+        page=page,
+        size=size
+    )
+
+    post_out_items = [
+        PostOut(
+            id=e.post.id,
+            community_id=e.post.community_id,
+            author_id=e.post.author_id,
+            author_username=e.author_username,
+            title=e.post.title,
+            content=e.post.content,
+            score=e.post.score,
+            comment_count=e.comment_count,
+            thread_id=e.post.thread_id,
+            thread_position=e.post.thread_position,
+            thread_total_parts=e.thread_total_parts,
+            created_at=e.post.created_at,
+            updated_at=e.post.updated_at,
+        )
+        for e in enriched_items
+    ]
+
+    return PaginatedPosts(
+        items=post_out_items,
+        total=total,
+        page=page,
+        size=size
+    )
+
+
+@router.get(
+    "/{community_id}/posts/search",
+    response_model=PaginatedPosts,
+    status_code=status.HTTP_200_OK,
+    summary="Search posts in a community by title/content"
+)
+async def search_community_posts(
+    community_id: str,
+    q: str = Query(..., description="Search query string"),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Page size"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if not q or not q.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Search query cannot be empty."
+        )
+
+    uni_uuid = uuid.UUID(current_user["university_id"])
+    try:
+        community_uuid = uuid.UUID(community_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Community not found."
+        )
+
+    community_stmt = select(Community).where(Community.id == community_uuid)
+    community_result = await db.execute(community_stmt)
+    community = community_result.scalar_one_or_none()
+
+    if not community or community.university_id != uni_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Community not found."
+        )
+
+    enriched_items, total = await search_posts(
+        db=db,
+        community_id=community_uuid,
+        query_str=q,
         page=page,
         size=size
     )
@@ -522,3 +598,49 @@ async def create_new_comment(
         )
         
     return comment
+
+
+@posts_router.post(
+    "/{post_id}/bookmark",
+    status_code=status.HTTP_200_OK,
+    summary="Toggle bookmark status for a post"
+)
+async def toggle_post_bookmark(
+    post_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    user_id_str = current_user["user_id"]
+    user_uuid = uuid.UUID(user_id_str)
+    uni_uuid = uuid.UUID(current_user["university_id"])
+
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found."
+        )
+
+    post_stmt = select(Post).where(Post.id == post_uuid, Post.is_deleted == False)
+    post_result = await db.execute(post_stmt)
+    post = post_result.scalar_one_or_none()
+
+    if not post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found."
+        )
+
+    community_stmt = select(Community).where(Community.id == post.community_id)
+    community_result = await db.execute(community_stmt)
+    community = community_result.scalar_one_or_none()
+
+    if not community or community.university_id != uni_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found."
+        )
+
+    is_bookmarked = await toggle_bookmark(db=db, user_id=user_uuid, post_id=post_uuid)
+    return {"post_id": post_id, "is_bookmarked": is_bookmarked}

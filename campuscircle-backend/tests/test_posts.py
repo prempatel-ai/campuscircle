@@ -10,6 +10,7 @@ from src.models.university import University
 from src.models.user import User
 from src.models.community import Community
 from src.models.post import Post
+from src.repositories.post_repository import create_post
 from src.auth.security import create_access_token
 
 
@@ -360,3 +361,141 @@ async def test_create_thread_and_feed_deduplication(
     assert parts_data[0]["thread_position"] == 1
     assert parts_data[1]["thread_position"] == 2
     assert parts_data[2]["thread_position"] == 3
+
+
+@pytest.mark.asyncio
+async def test_get_my_posts_success(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    setup_universities
+):
+    uni_a, uni_b = setup_universities
+    user_a = User(
+        username="my_user_a",
+        email=f"myuser_a_{uuid.uuid4().hex[:6]}@unia.edu",
+        password_hash="hashed_pw",
+        university_id=uni_a.id,
+        email_verified=True,
+        role="student",
+    )
+    user_b = User(
+        username="my_user_b",
+        email=f"myuser_b_{uuid.uuid4().hex[:6]}@unia.edu",
+        password_hash="hashed_pw",
+        university_id=uni_a.id,
+        email_verified=True,
+        role="student",
+    )
+    db_session.add_all([user_a, user_b])
+    await db_session.commit()
+
+    comm = Community(name="My Posts Comm", description="Test", university_id=uni_a.id, created_by=user_a.id)
+    db_session.add(comm)
+    await db_session.commit()
+
+    # User A creates a post
+    post_a_id = await create_post(db_session, comm.id, user_a.id, "User A Post Title", "Content A")
+    # User B creates a post
+    await create_post(db_session, comm.id, user_b.id, "User B Post Title", "Content B")
+
+    token_a = create_access_token(
+        user_id=user_a.id,
+        university_id=user_a.university_id,
+        role=user_a.role,
+        username=user_a.username,
+    )
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+
+    # Fetch user A's own posts
+    res = await client.get("/api/v1/users/me/posts", headers=headers_a)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    assert data["items"][0]["id"] == str(post_a_id)
+    assert data["items"][0]["title"] == "User A Post Title"
+    assert data["items"][0]["author_username"] == "my_user_a"
+
+
+@pytest.mark.asyncio
+async def test_search_posts_empty_query_returns_400(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    setup_universities
+):
+    uni_a, _ = setup_universities
+    user = User(
+        username="search_u",
+        email=f"search_u_{uuid.uuid4().hex[:6]}@unia.edu",
+        password_hash="hashed_pw",
+        university_id=uni_a.id,
+        email_verified=True,
+        role="student",
+    )
+    db_session.add(user)
+    await db_session.commit()
+
+    comm = Community(name="Search Comm", description="Test", university_id=uni_a.id, created_by=user.id)
+    db_session.add(comm)
+    await db_session.commit()
+
+    token = create_access_token(user_id=user.id, university_id=user.university_id, role=user.role, username=user.username)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Empty and whitespace-only queries must return 400 Bad Request
+    res1 = await client.get(f"/api/v1/communities/{comm.id}/posts/search?q=", headers=headers)
+    assert res1.status_code == 400
+
+    res2 = await client.get(f"/api/v1/communities/{comm.id}/posts/search?q=   ", headers=headers)
+    assert res2.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_search_posts_success_and_community_isolation(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    setup_universities
+):
+    uni_a, _ = setup_universities
+    user = User(
+        username="search_user",
+        email=f"search_user_{uuid.uuid4().hex[:6]}@unia.edu",
+        password_hash="hashed_pw",
+        university_id=uni_a.id,
+        email_verified=True,
+        role="student",
+    )
+    db_session.add(user)
+    await db_session.commit()
+
+    comm_a = Community(name="Search Comm A", description="Test A", university_id=uni_a.id, created_by=user.id)
+    comm_b = Community(name="Search Comm B", description="Test B", university_id=uni_a.id, created_by=user.id)
+    db_session.add_all([comm_a, comm_b])
+    await db_session.commit()
+
+    # Post 1 in Comm A (matches "Thermodynamics" in title)
+    post1_id = await create_post(db_session, comm_a.id, user.id, "Quantum Thermodynamics Intro", "Statistical mechanics basics")
+    # Post 2 in Comm A (matches "Quantum" in content)
+    post2_id = await create_post(db_session, comm_a.id, user.id, "Linear Algebra", "Fundamentals of quantum computing matrices")
+    # Post 3 in Comm B (matches "Quantum", but belongs to Comm B!)
+    post3_id = await create_post(db_session, comm_b.id, user.id, "Quantum Optics", "Photon statistics")
+
+    token = create_access_token(user_id=user.id, university_id=user.university_id, role=user.role, username=user.username)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Search "Thermodynamics" in Comm A -> returns post 1
+    res1 = await client.get(f"/api/v1/communities/{comm_a.id}/posts/search?q=Thermodynamics", headers=headers)
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert data1["total"] == 1
+    assert data1["items"][0]["id"] == str(post1_id)
+
+    # 2. Search "Quantum" in Comm A -> returns post 1 and post 2, but EXCLUDES post 3 from Comm B
+    res2 = await client.get(f"/api/v1/communities/{comm_a.id}/posts/search?q=Quantum", headers=headers)
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["total"] == 2
+    returned_ids = {item["id"] for item in data2["items"]}
+    assert str(post1_id) in returned_ids
+    assert str(post2_id) in returned_ids
+    assert str(post3_id) not in returned_ids

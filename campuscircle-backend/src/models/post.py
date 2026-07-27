@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Text, Integer, SmallInteger, Boolean, DateTime, ForeignKey, func
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import String, Text, Integer, SmallInteger, Boolean, DateTime, ForeignKey, Computed, func
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
@@ -19,6 +19,15 @@ class Post(Base):
 
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    search_vector: Mapped[str | None] = mapped_column(
+        TSVECTOR,
+        Computed(
+            "setweight(to_tsvector('english', coalesce(title, '')), 'A') || "
+            "setweight(to_tsvector('english', coalesce(content, '')), 'B')",
+            persisted=True
+        ),
+        nullable=True
+    )
 
     # Threading support for multi-part linked posts
     thread_id: Mapped[uuid.UUID | None] = mapped_column(

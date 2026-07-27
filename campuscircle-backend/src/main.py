@@ -12,6 +12,8 @@ from src.api.auth import router as auth_router
 from src.api.communities import router as communities_router
 from src.api.posts import router as posts_router, posts_router as posts_detail_router
 from src.api.votes import router as votes_router
+from src.api.users import router as users_router
+from src.api.notifications import router as notifications_router
 
 app = FastAPI(
     title=settings.app_name,
@@ -36,6 +38,10 @@ app.include_router(posts_router, prefix="/api/v1")
 app.include_router(posts_detail_router, prefix="/api/v1")
 # Wire the votes endpoints
 app.include_router(votes_router, prefix="/api/v1")
+# Wire the users endpoints
+app.include_router(users_router, prefix="/api/v1")
+# Wire the notifications endpoints
+app.include_router(notifications_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["system"])
