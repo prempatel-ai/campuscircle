@@ -51,8 +51,22 @@ function getRelativeTime(dateString: string): string {
 export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const relativeTime = getRelativeTime(post.created_at);
   const [reporting, setReporting] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
   const isThread = post.thread_total_parts && post.thread_total_parts > 1;
+
+  const handleBookmarkToggle = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const nextState = !isBookmarked;
+    setIsBookmarked(nextState);
+    try {
+      const { apiRequest } = await import("@/lib/api");
+      await apiRequest(`/api/v1/posts/${post.id}/bookmark`, { method: "POST" });
+    } catch (_) {
+      setIsBookmarked(!nextState);
+    }
+  };
 
   return (
     <>
@@ -103,27 +117,54 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
         </Link>
 
         {/* Interaction Bar */}
-        <div className="flex items-center gap-5 pt-1.5 border-t border-border-muted/50 text-ink/60">
-          {/* Score Control */}
-          <VoteControl targetId={post.id} targetType="post" initialScore={post.score} />
+        <div className="flex items-center justify-between pt-1.5 border-t border-border-muted/50 text-ink/60">
+          <div className="flex items-center gap-5">
+            {/* Score Control */}
+            <VoteControl targetId={post.id} targetType="post" initialScore={post.score} />
 
-          {/* Comment Count — real value from API, links to post detail */}
-          <Link
-            href={`/posts/${post.id}`}
-            className="flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer text-xs font-semibold"
+            {/* Comment Count — real value from API, links to post detail */}
+            <Link
+              href={`/posts/${post.id}`}
+              className="flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer text-xs font-semibold"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
+              </svg>
+              <span>
+                {post.comment_count} {post.comment_count === 1 ? "comment" : "comments"}
+              </span>
+            </Link>
+          </div>
+
+          {/* Bookmark / Save Button */}
+          <button
+            onClick={handleBookmarkToggle}
+            aria-label={isBookmarked ? "Remove bookmark" : "Save post"}
+            title={isBookmarked ? "Saved" : "Save post"}
+            className={`flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer text-xs font-semibold px-2 py-1 rounded-lg hover:bg-background ${
+              isBookmarked ? "text-primary font-bold bg-primary/10" : ""
+            }`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-4 h-4"
+              fill={isBookmarked ? "currentColor" : "none"}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
               />
             </svg>
-            <span>
-              {post.comment_count} {post.comment_count === 1 ? "comment" : "comments"}
-            </span>
-          </Link>
+            <span>{isBookmarked ? "Saved" : "Save"}</span>
+          </button>
         </div>
       </article>
 
