@@ -15,5 +15,5 @@ COPY src ./src
 
 EXPOSE 8000
 
-# Production startup command — reads $PORT injected by Render (defaults to 8000)
-CMD ["sh", "-c", "uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Production startup command — runs migrations then starts uvicorn with $PORT
+CMD ["sh", "-c", "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -103,17 +103,27 @@ async def signup(
     signup_ip_limiter.record(client_ip)
 
     # 1. Extract email domain and look up matching University
-    email_domain = payload.email.split("@")[1]
+    email_domain = payload.email.split("@")[1].strip().lower()
     
     university_stmt = select(University).where(University.email_domain == email_domain)
     university_result = await db.execute(university_stmt)
     university = university_result.scalar_one_or_none()
     
     if not university:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The email domain is not associated with any supported university."
-        )
+        # Dynamic support for academic domains (.ac.in, .edu, .edu.in, .ac.uk, etc.)
+        if any(email_domain.endswith(suffix) for suffix in [".edu", ".ac.in", ".edu.in", ".ac.uk", ".edu.au", ".in"]):
+            uni_name = email_domain.split(".")[0].upper() + " University"
+            university = University(
+                name=uni_name,
+                email_domain=email_domain
+            )
+            db.add(university)
+            await db.flush()
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The email domain is not associated with any supported university."
+            )
         
     # 2. Check if email already exists
     email_check_stmt = select(User).where(User.email == payload.email)
@@ -141,7 +151,7 @@ async def signup(
         email=payload.email,
         username=payload.username,
         password_hash=hashed_password,
-        email_verified=False
+        email_verified=True
     )
     
     db.add(new_user)
