@@ -1,3 +1,4 @@
+import uuid
 import time
 from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, status
@@ -112,10 +113,9 @@ async def signup(
     if not university:
         # Dynamic support for academic domains (.ac.in, .edu, .edu.in, .ac.uk, etc.)
         if any(email_domain.endswith(suffix) for suffix in [".edu", ".ac.in", ".edu.in", ".ac.uk", ".edu.au", ".in"]):
-            import uuid as uuid_lib
             uni_name = email_domain.split(".")[0].upper() + " University"
             university = University(
-                id=uuid_lib.uuid4(),
+                id=uuid.uuid4(),
                 name=uni_name,
                 email_domain=email_domain
             )
@@ -149,7 +149,7 @@ async def signup(
     hashed_password = hash_password(payload.password)
     
     new_user = User(
-        id=uuid_lib.uuid4(),
+        id=uuid.uuid4(),
         university_id=university.id,
         email=payload.email,
         username=payload.username,
