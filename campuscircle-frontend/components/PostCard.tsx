@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnonAvatar } from "./AnonAvatar";
 import { VoteControl } from "./VoteControl";
 import { ReportDialog } from "./ReportDialog";
+import { ThreadProgressDots } from "./ThreadProgressDots";
 
 interface Post {
   id: string;
@@ -82,9 +83,10 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
                   @{post.author_username}
                 </span>
                 {isThread && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
-                    🧵 1/{post.thread_total_parts}
-                  </span>
+                  <ThreadProgressDots
+                    totalParts={post.thread_total_parts!}
+                    currentPosition={post.thread_position || 1}
+                  />
                 )}
               </div>
               <span className="text-[10px] text-ink/40 font-sans tracking-wide">

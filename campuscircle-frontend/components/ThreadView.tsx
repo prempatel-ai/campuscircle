@@ -3,6 +3,7 @@
 import React from "react";
 import { AnonAvatar } from "./AnonAvatar";
 import { VoteControl } from "./VoteControl";
+import { ThreadProgressDots } from "./ThreadProgressDots";
 
 interface PostPart {
   id: string;
@@ -32,15 +33,10 @@ export const ThreadView: React.FC<ThreadViewProps> = ({ parts, onReportClick }) 
     <div className="bg-surface border border-border-muted rounded-2xl p-5 shadow-sm space-y-6">
       {/* Thread Header Banner */}
       <div className="flex items-center justify-between pb-3 border-b border-border-muted/50">
-        <div className="flex items-center gap-2">
-          <span className="text-base">🧵</span>
-          <h2 className="font-display text-base font-bold text-primary">
-            Multi-Part Thread ({parts.length} parts)
-          </h2>
-        </div>
-        <span className="text-xs font-mono font-bold bg-primary/10 text-primary px-2.5 py-1 rounded-full">
-          Connected Sequence
-        </span>
+        <h2 className="font-display text-base font-bold text-primary">
+          Multi-Part Thread
+        </h2>
+        <ThreadProgressDots totalParts={parts.length} currentPosition={parts.length} />
       </div>
 
       {/* Connected Thread Parts Sequence */}
@@ -72,9 +68,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({ parts, onReportClick }) 
                     <span className="font-mono text-xs text-accent font-semibold">
                       @{part.author_username}
                     </span>
-                    <span className="font-mono text-[11px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                      {pos}/{total}
-                    </span>
+                    <ThreadProgressDots totalParts={total} currentPosition={pos} />
                   </div>
 
                   {onReportClick && (

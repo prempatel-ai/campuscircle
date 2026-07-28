@@ -125,7 +125,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                     My Posts
                   </Link>
                   <a
-                    href="mailto:support@campuscircle.edu?subject=CampusCircle%20Issue%20Report"
+                    href="mailto:rolexhere03@gmail.com?subject=CampusCircle%20Issue%20Report"
                     onClick={() => setIsMenuOpen(false)}
                     className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
                   >
