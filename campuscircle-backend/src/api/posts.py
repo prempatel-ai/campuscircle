@@ -18,11 +18,65 @@ from src.repositories.post_repository import (
     get_post_by_id,
     get_thread_posts,
     search_posts,
+    search_university_posts,
     toggle_bookmark
 )
 
 router = APIRouter(prefix="/communities", tags=["posts"])
 posts_router = APIRouter(prefix="/posts", tags=["posts"])
+
+
+@posts_router.get(
+    "/search",
+    response_model=PaginatedPosts,
+    status_code=status.HTTP_200_OK,
+    summary="Search posts, topics, and communities across caller's university"
+)
+async def search_university_posts_endpoint(
+    q: str = Query(..., min_length=1, description="Search query string"),
+    community_id: str | None = Query(None, description="Optional community filter"),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Page size"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    uni_uuid = uuid.UUID(current_user["university_id"])
+    comm_uuid = uuid.UUID(community_id) if community_id else None
+
+    enriched_items, total = await search_university_posts(
+        db=db,
+        university_id=uni_uuid,
+        query_str=q,
+        community_id=comm_uuid,
+        page=page,
+        size=size
+    )
+
+    post_out_items = [
+        PostOut(
+            id=item.post.id,
+            community_id=item.post.community_id,
+            author_id=item.post.author_id,
+            author_username=item.author_username,
+            title=item.post.title,
+            content=item.post.content,
+            score=item.post.score,
+            comment_count=item.comment_count,
+            thread_id=item.post.thread_id,
+            thread_position=item.post.thread_position,
+            thread_total_parts=item.thread_total_parts,
+            created_at=item.post.created_at,
+            updated_at=item.post.updated_at,
+        )
+        for item in enriched_items
+    ]
+
+    return PaginatedPosts(
+        items=post_out_items,
+        total=total,
+        page=page,
+        size=size
+    )
 
 
 @router.post(

@@ -439,6 +439,93 @@ async def search_posts(
     return enriched, total_count
 
 
+async def search_university_posts(
+    db: AsyncSession,
+    university_id: uuid.UUID,
+    query_str: str,
+    community_id: uuid.UUID | None = None,
+    page: int = 1,
+    size: int = 20
+) -> Tuple[List[EnrichedPost], int]:
+    """
+    Search active posts across the user's university matching topic/keyword in
+    title, content, or community name/description.
+    Excludes soft-deleted posts and thread parts 2+.
+    """
+    from sqlalchemy import or_
+    from src.models.community import Community
+
+    if page < 1:
+        page = 1
+    if size < 1:
+        size = 20
+
+    clean_q = f"%{query_str.strip()}%"
+
+    comment_count_col = _comment_count_subquery(Post.id)
+    thread_total_col = _thread_total_parts_subquery(Post.thread_id)
+
+    match_condition = or_(
+        Post.title.ilike(clean_q),
+        Post.content.ilike(clean_q),
+        Community.name.ilike(clean_q),
+        Community.description.ilike(clean_q)
+    )
+
+    base_query = (
+        select(
+            Post,
+            User.username.label("author_username"),
+            comment_count_col.label("comment_count"),
+            func.coalesce(thread_total_col, 1).label("thread_total_parts")
+        )
+        .join(User, User.id == Post.author_id)
+        .join(Community, Community.id == Post.community_id)
+        .where(
+            Community.university_id == university_id,
+            Post.is_deleted == False,
+            match_condition,
+            or_(Post.thread_position == 1, Post.thread_position.is_(None))
+        )
+    )
+
+    if community_id:
+        base_query = base_query.where(Post.community_id == community_id)
+
+    count_stmt = (
+        select(func.count(Post.id))
+        .join(Community, Community.id == Post.community_id)
+        .where(
+            Community.university_id == university_id,
+            Post.is_deleted == False,
+            match_condition,
+            or_(Post.thread_position == 1, Post.thread_position.is_(None))
+        )
+    )
+    if community_id:
+        count_stmt = count_stmt.where(Post.community_id == community_id)
+
+    count_result = await db.execute(count_stmt)
+    total_count = count_result.scalar_one() or 0
+
+    query = base_query.order_by(Post.created_at.desc()).offset((page - 1) * size).limit(size)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    enriched = [
+        EnrichedPost(
+            post=row[0],
+            author_username=row[1],
+            comment_count=row[2],
+            thread_total_parts=row[3] or 1
+        )
+        for row in rows
+    ]
+
+    return enriched, total_count
+
+
 async def toggle_bookmark(
     db: AsyncSession,
     user_id: uuid.UUID,
