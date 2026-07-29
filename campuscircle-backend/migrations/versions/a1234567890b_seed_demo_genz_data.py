@@ -118,8 +118,8 @@ def upgrade() -> None:
         user_map[u["username"]] = u_id
         bind.execute(
             sa.text(
-                "INSERT INTO users (id, university_id, email, username, password_hash, email_verified, is_admin, is_banned) "
-                "VALUES (:id, :uni_id, :email, :username, :pw_hash, true, false, false) "
+                "INSERT INTO users (id, university_id, email, username, password_hash, email_verified, role, is_banned) "
+                "VALUES (:id, :uni_id, :email, :username, :pw_hash, true, 'student', false) "
                 "ON CONFLICT (email) DO NOTHING;"
             ),
             {"id": u_id, "uni_id": uni_id, "email": u["email"], "username": u["username"], "pw_hash": default_pw_hash}
