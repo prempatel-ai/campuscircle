@@ -44,10 +44,19 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
   const avatarSeed = user?.username || "anonymous";
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   const handleLogout = async () => {
     setIsMenuOpen(false);
     await logout();
     router.push("/login");
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/feed?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
   };
 
   return (
@@ -58,12 +67,30 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           {/* Logo / Wordmark */}
           <Link
             href="/feed"
-            className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 hover:opacity-90 transition-opacity shrink-0"
           >
             <span className="font-display text-2xl font-bold tracking-tight text-primary">
               CampusCircle
             </span>
           </Link>
+
+          {/* Global Search Bar */}
+          <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md mx-4 hidden sm:block">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ink/40">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search topics, posts, or communities..."
+                className="w-full pl-9 pr-4 py-1.5 bg-background border border-border-muted/80 rounded-full text-xs text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
+              />
+            </div>
+          </form>
 
           {/* Account Menu Dropdown */}
           <div className="relative" ref={menuRef}>

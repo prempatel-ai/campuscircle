@@ -57,8 +57,11 @@ export function TrendingTags({ activeTag, onSelectTag }: TrendingTagsProps) {
   return (
     <div className="bg-surface border border-border-muted rounded-2xl p-5 space-y-3.5 shadow-2xs">
       <div className="flex items-center justify-between">
-        <h3 className="font-display text-sm font-bold text-primary flex items-center gap-1.5">
-          <span>🔥</span> Trending Hashtags
+        <h3 className="font-display text-sm font-bold text-primary flex items-center gap-2">
+          <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+          </svg>
+          <span>Trending Hashtags</span>
         </h3>
         {activeTag && (
           <button

@@ -52,6 +52,7 @@ function FeedContent() {
 
   const communityQueryParam = searchParams.get("community");
   const tagQueryParam = searchParams.get("tag");
+  const searchQueryParam = searchParams.get("search");
 
   const [communities, setCommunities] = useState<Community[]>([]);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
@@ -108,11 +109,12 @@ function FeedContent() {
     setSelectedCommunityId(firstId);
   }, [communities, communityQueryParam]);
 
-  // 3. Tab Select Handler — updates URL via router.push
+  // 3. Tab & Tag Select Handlers
   const handleSelectCommunity = (id: string) => {
     setSelectedCommunityId(id);
     const params = new URLSearchParams(searchParams.toString());
     params.set("community", id);
+    params.delete("search");
     router.push(`/feed?${params.toString()}`, { scroll: false });
   };
 
@@ -123,6 +125,13 @@ function FeedContent() {
     } else {
       params.delete("tag");
     }
+    params.delete("search");
+    router.push(`/feed?${params.toString()}`, { scroll: false });
+  };
+
+  const handleClearSearch = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("search");
     router.push(`/feed?${params.toString()}`, { scroll: false });
   };
 
@@ -133,13 +142,16 @@ function FeedContent() {
       currentSort: SortType,
       currentPage: number,
       activeTag: string | null,
+      activeSearch: string | null,
       append = false
     ) => {
       setIsPostsLoading(true);
       setError(null);
       try {
         let endpoint = "";
-        if (currentSort === "for-you") {
+        if (activeSearch) {
+          endpoint = `/api/v1/posts/search?q=${encodeURIComponent(activeSearch)}&page=${currentPage}&size=${PAGE_SIZE}`;
+        } else if (currentSort === "for-you") {
           endpoint = `/api/v1/feed/for-you?page=${currentPage}&size=${PAGE_SIZE}`;
         } else if (communityId) {
           endpoint = `/api/v1/communities/${communityId}/posts?sort=${currentSort}&page=${currentPage}&size=${PAGE_SIZE}${
@@ -172,19 +184,19 @@ function FeedContent() {
     []
   );
 
-  // 5. Trigger Post fetch when community, sort, or tag changes
+  // 5. Trigger Post fetch when community, sort, tag, or search changes
   useEffect(() => {
-    if (sort !== "for-you" && !selectedCommunityId) return;
+    if (!searchQueryParam && sort !== "for-you" && !selectedCommunityId) return;
     setPage(1);
-    fetchPosts(selectedCommunityId, sort, 1, tagQueryParam, false);
-  }, [selectedCommunityId, sort, tagQueryParam, fetchPosts]);
+    fetchPosts(selectedCommunityId, sort, 1, tagQueryParam, searchQueryParam, false);
+  }, [selectedCommunityId, sort, tagQueryParam, searchQueryParam, fetchPosts]);
 
   // 6. Load More handler
   const handleLoadMore = () => {
     if (isPostsLoading || !hasMore) return;
     const nextPage = page + 1;
     setPage(nextPage);
-    fetchPosts(selectedCommunityId, sort, nextPage, tagQueryParam, true);
+    fetchPosts(selectedCommunityId, sort, nextPage, tagQueryParam, searchQueryParam, true);
   };
 
   const handlePostCreated = (newPost: Post) => {
@@ -200,7 +212,7 @@ function FeedContent() {
 
   return (
     <div className="flex-1 text-ink font-sans grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 py-6 items-start pb-16">
-      {/* 1. Left Sidebar Column (3 cols on desktop) */}
+      {/* 1. Left Sidebar Column */}
       <div className="lg:col-span-3 lg:sticky lg:top-20">
         {!isCommunitiesLoading && (
           <CommunityTabs
@@ -213,10 +225,29 @@ function FeedContent() {
         )}
       </div>
 
-      {/* 2. Main Center Feed Column (6 cols on desktop) */}
+      {/* 2. Main Center Feed Column */}
       <div className="lg:col-span-6 w-full flex flex-col space-y-6">
+        {/* Search Results Filter Banner */}
+        {searchQueryParam && (
+          <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span className="text-sm font-sans text-ink/80">Search results for:</span>
+              <span className="font-mono text-sm font-bold text-primary">"{searchQueryParam}"</span>
+            </div>
+            <button
+              onClick={handleClearSearch}
+              className="text-xs font-sans text-primary hover:underline font-bold cursor-pointer"
+            >
+              Clear search
+            </button>
+          </div>
+        )}
+
         {/* Active Tag Filter Banner */}
-        {tagQueryParam && (
+        {tagQueryParam && !searchQueryParam && (
           <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
             <div className="flex items-center gap-2">
               <span className="text-sm font-sans text-ink/80">Filtering posts tagged:</span>
@@ -239,7 +270,7 @@ function FeedContent() {
             <button
               onClick={() => {
                 setError(null);
-                fetchPosts(selectedCommunityId, sort, 1, tagQueryParam, false);
+                fetchPosts(selectedCommunityId, sort, 1, tagQueryParam, searchQueryParam, false);
               }}
               className="px-6 py-2.5 bg-primary text-surface font-sans font-semibold rounded-xl text-sm"
             >
@@ -276,8 +307,8 @@ function FeedContent() {
           </div>
         )}
 
-        {/* Feed Sort Tabs: For You, New, Hot, Top */}
-        {!isCommunitiesLoading && (communities.length > 0 || sort === "for-you") && !error && (
+        {/* Feed Sort Tabs */}
+        {!isCommunitiesLoading && !searchQueryParam && (communities.length > 0 || sort === "for-you") && !error && (
           <div className="flex bg-surface rounded-xl p-1 border border-border-muted w-full shadow-2xs">
             {SORT_OPTIONS.map((s) => (
               <button
@@ -312,7 +343,9 @@ function FeedContent() {
               <div className="bg-surface border border-border-muted rounded-2xl p-10 text-center space-y-3 shadow-2xs">
                 <h3 className="font-display text-lg font-bold text-primary">Nothing here yet</h3>
                 <p className="font-sans text-sm text-ink/75 max-w-xs mx-auto">
-                  {tagQueryParam
+                  {searchQueryParam
+                    ? `No posts or topics found matching "${searchQueryParam}".`
+                    : tagQueryParam
                     ? `No posts found tagged #${tagQueryParam}.`
                     : "Be the first to post and spark a discussion!"}
                 </p>
@@ -337,14 +370,17 @@ function FeedContent() {
         )}
       </div>
 
-      {/* 3. Right Sidebar Column (3 cols on desktop) */}
+      {/* 3. Right Sidebar Column */}
       <div className="hidden lg:flex lg:col-span-3 flex-col gap-5 lg:sticky lg:top-20">
         <TrendingTags activeTag={tagQueryParam} onSelectTag={handleSelectTag} />
 
-        {/* Campus Accountability Card */}
+        {/* Campus Guidelines Card */}
         <div className="bg-surface border border-border-muted rounded-2xl p-5 space-y-3 shadow-2xs">
-          <h3 className="font-display text-sm font-bold text-primary flex items-center gap-1.5">
-            <span>🛡️</span> Campus Accountability
+          <h3 className="font-display text-sm font-bold text-primary flex items-center gap-2">
+            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <span>Campus Accountability</span>
           </h3>
           <p className="font-sans text-xs text-ink/75 leading-relaxed">
             CampusCircle pairs verified student emails with pseudonymous handles. Be candid, respectful, and helpful to your peers.
