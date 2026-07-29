@@ -15,10 +15,10 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // If already authenticated, redirect to home page
+  // If already authenticated, redirect directly to feed page
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.push("/");
+      router.push("/feed");
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -42,7 +42,7 @@ export default function LoginPage() {
 
       // Login using AuthContext which handles token storage and state updates
       login(response.access_token, response.refresh_token);
-      router.push("/");
+      router.push("/feed");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

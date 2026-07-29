@@ -38,7 +38,7 @@ export default function Home() {
     return () => observer.disconnect();
   }, []);
 
-  if (isLoading) {
+  if (isLoading || isAuthenticated) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
         <div className="border-4 border-primary border-t-transparent animate-spin w-10 h-10 rounded-full" />
