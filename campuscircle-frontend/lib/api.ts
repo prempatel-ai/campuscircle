@@ -30,10 +30,57 @@ export async function apiRequest<T>(
     }
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  let response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers,
   });
+
+  // If 401 Unauthorized, attempt transparent token refresh once
+  if (
+    response.status === 401 && 
+    typeof window !== "undefined" && 
+    !path.includes("/auth/login") && 
+    !path.includes("/auth/refresh")
+  ) {
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (refreshToken) {
+      try {
+        const refreshRes = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          localStorage.setItem("access_token", data.access_token);
+          if (data.refresh_token) {
+            localStorage.setItem("refresh_token", data.refresh_token);
+          }
+
+          // Retry original request with new access token
+          headers.set("Authorization", `Bearer ${data.access_token}`);
+          response = await fetch(`${API_URL}${path}`, {
+            ...options,
+            headers,
+          });
+        } else {
+          // Refresh token expired or revoked — clear tokens and redirect to login
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          window.location.href = "/login";
+        }
+      } catch (_) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        window.location.href = "/login";
+      }
+    } else {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/login";
+    }
+  }
 
   if (!response.ok) {
     let detail = "An unexpected error occurred.";
@@ -41,7 +88,7 @@ export async function apiRequest<T>(
       const data = await response.json();
       detail = data.detail || detail;
     } catch (_) {
-      // Failed to parse JSON error (e.g. timeout or HTML error page)
+      // Failed to parse JSON error
     }
     throw new ApiError(response.status, detail);
   }
