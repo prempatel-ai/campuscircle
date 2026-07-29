@@ -424,3 +424,12 @@ async def reset_password(
     return ResetPasswordResponse(
         message="Password reset successfully. Please log in with your new password."
     )
+
+
+@router.get(
+    "/test-email",
+    summary="Diagnostic endpoint to test live email delivery configuration"
+)
+async def test_email_delivery(to: str = "2023095900025953_ce@spcevng.ac.in"):
+    from src.workers.email import diagnose_email_sending
+    return diagnose_email_sending(to)

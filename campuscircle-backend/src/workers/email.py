@@ -10,11 +10,88 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 
+def diagnose_email_sending(to_email: str) -> dict:
+    """
+    Executes a test email send synchronously and returns detailed diagnostic results.
+    """
+    results = {
+        "smtp_configured": bool(settings.smtp_username and settings.smtp_password),
+        "resend_configured": bool(settings.resend_api_key),
+        "smtp_server": settings.smtp_server,
+        "smtp_port": settings.smtp_port,
+        "smtp_username": settings.smtp_username if settings.smtp_username else "NOT_SET",
+        "methods_tried": [],
+        "status": "pending",
+        "details": ""
+    }
+
+    subject = "CampusCircle Email Delivery Test"
+    text_content = "This is a test email from CampusCircle to verify email delivery configurations."
+    html_content = "<h2>CampusCircle Email Test</h2><p>This is a test email confirming email delivery is active!</p>"
+
+    # 1. Try SMTP if configured
+    if settings.smtp_username and settings.smtp_password:
+        results["methods_tried"].append("smtp")
+        sender = settings.from_email_address.strip() or settings.smtp_username.strip()
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = sender
+        msg["To"] = to_email
+        msg.attach(MIMEText(text_content, "plain"))
+        msg.attach(MIMEText(html_content, "html"))
+
+        try:
+            if settings.smtp_port == 465:
+                with smtplib.SMTP_SSL(settings.smtp_server, settings.smtp_port, timeout=10) as server:
+                    server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
+                    server.sendmail(sender, [to_email], msg.as_string())
+            else:
+                with smtplib.SMTP(settings.smtp_server, settings.smtp_port, timeout=10) as server:
+                    server.starttls()
+                    server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
+                    server.sendmail(sender, [to_email], msg.as_string())
+
+            results["status"] = "success"
+            results["details"] = f"Successfully delivered email to {to_email} via SMTP ({settings.smtp_server})"
+            return results
+        except Exception as e:
+            results["smtp_error"] = str(e)
+            logger.error(f"SMTP diagnostic failed: {str(e)}", exc_info=True)
+
+    # 2. Try Resend API if configured
+    if settings.resend_api_key and settings.resend_api_key.strip():
+        results["methods_tried"].append("resend")
+        try:
+            import resend
+            resend.api_key = settings.resend_api_key.strip()
+            sender = settings.from_email_address.strip() or "onboarding@resend.dev"
+            params: resend.Emails.SendParams = {
+                "from": sender,
+                "to": [to_email],
+                "subject": subject,
+                "html": html_content,
+            }
+            res = resend.Emails.send(params)
+            email_id = getattr(res, "id", None) or (res.get("id") if isinstance(res, dict) else "sent")
+            results["status"] = "success"
+            results["details"] = f"Successfully delivered email to {to_email} via Resend API (ID: {email_id})"
+            return results
+        except Exception as e:
+            results["resend_error"] = str(e)
+            logger.error(f"Resend diagnostic failed: {str(e)}", exc_info=True)
+
+    # 3. Fallback to Local Dev Stub
+    results["methods_tried"].append("stub")
+    results["status"] = "stubbed"
+    results["details"] = (
+        "Neither SMTP nor Resend API credentials are valid/configured on Render. "
+        "The system logged the email to server logs instead of sending a physical email. "
+        "Please check your Render environment variables (SMTP_USERNAME, SMTP_PASSWORD)."
+    )
+    return results
+
+
 def _send_via_smtp(to_email: str, subject: str, html_content: str, text_content: str) -> bool:
-    """
-    Sends email via standard SMTP (e.g. Gmail SMTP with App Password, Brevo, etc.).
-    Returns True if sent successfully, False otherwise.
-    """
     if not settings.smtp_username or not settings.smtp_password:
         return False
 
@@ -24,12 +101,8 @@ def _send_via_smtp(to_email: str, subject: str, html_content: str, text_content:
     msg["Subject"] = subject
     msg["From"] = sender
     msg["To"] = to_email
-
-    part1 = MIMEText(text_content, "plain")
-    part2 = MIMEText(html_content, "html")
-
-    msg.attach(part1)
-    msg.attach(part2)
+    msg.attach(MIMEText(text_content, "plain"))
+    msg.attach(MIMEText(html_content, "html"))
 
     try:
         if settings.smtp_port == 465:
@@ -50,9 +123,6 @@ def _send_via_smtp(to_email: str, subject: str, html_content: str, text_content:
 
 
 def _send_via_resend(to_email: str, subject: str, html_content: str) -> bool:
-    """
-    Sends email via Resend API if API key is provided.
-    """
     if not settings.resend_api_key or not settings.resend_api_key.strip():
         return False
 
@@ -78,13 +148,8 @@ def _send_via_resend(to_email: str, subject: str, html_content: str) -> bool:
 
 
 def send_verification_email(email: str, token: str) -> None:
-    """
-    Delivers a verification email containing the verification token link.
-    Tries SMTP first, then Resend API, then falls back to local dev stub.
-    """
     verification_link = f"{settings.frontend_url.rstrip('/')}/verify-pending?token={token}"
     subject = "Verify your CampusCircle Account"
-    
     text_content = f"Welcome to CampusCircle! Please verify your email by opening this link: {verification_link}"
     html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #DADDD8; border-radius: 16px; background-color: #F5F6F4;">
@@ -104,28 +169,20 @@ def send_verification_email(email: str, token: str) -> None:
     </div>
     """
 
-    # Try SMTP first
     if _send_via_smtp(email, subject, html_content, text_content):
         return
 
-    # Try Resend API second
     if _send_via_resend(email, subject, html_content):
         return
 
-    # Fallback to local dev log stub
     logger.info(f"[LOCAL DEV STUB] Sending email verification to {email}")
     logger.info(f"[LOCAL DEV STUB] Verification Link: {verification_link}")
     print(f"[LOCAL DEV STUB] Verification Link for {email}: {verification_link}")
 
 
 def send_password_reset_email(email: str, token: str) -> None:
-    """
-    Delivers a password reset email containing the password reset token link.
-    Tries SMTP first, then Resend API, then falls back to local dev stub.
-    """
     reset_link = f"{settings.frontend_url.rstrip('/')}/reset-password?token={token}"
     subject = "Reset your CampusCircle Password"
-
     text_content = f"CampusCircle Password Reset: Use this link to reset your password: {reset_link}"
     html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #DADDD8; border-radius: 16px; background-color: #F5F6F4;">
@@ -146,15 +203,12 @@ def send_password_reset_email(email: str, token: str) -> None:
     </div>
     """
 
-    # Try SMTP first
     if _send_via_smtp(email, subject, html_content, text_content):
         return
 
-    # Try Resend API second
     if _send_via_resend(email, subject, html_content):
         return
 
-    # Fallback to local dev log stub
     logger.info(f"[LOCAL DEV STUB] Sending password reset to {email}")
     logger.info(f"[LOCAL DEV STUB] Reset Link: {reset_link}")
     print(f"[LOCAL DEV STUB] Password Reset Link for {email}: {reset_link}")
