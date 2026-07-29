@@ -549,54 +549,13 @@ async def get_for_you_feed(
     from sqlalchemy import or_, case
     from src.models.community import Community
     from src.models.vote import Vote
-    from src.models.tag import Tag, post_tags
+    from src.models.comment import Comment
 
     if page < 1:
         page = 1
     if size < 1:
         size = 20
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-
-    # 1. Compute user's community interactions in last 30 days
-    # A. Votes by user
-    vote_stmt = (
-        select(Post.community_id, func.count(Vote.id))
-        .join(Post, Vote.post_id == Post.id)
-        .where(Vote.user_id == user_id, Vote.created_at >= cutoff)
-        .group_by(Post.community_id)
-    )
-    vote_res = await db.execute(vote_stmt)
-    vote_counts = {row[0]: row[1] for row in vote_res.all()}
-
-    # B. Comments by user
-    comment_stmt = (
-        select(Post.community_id, func.count(Comment.id))
-        .join(Post, Comment.post_id == Post.id)
-        .where(Comment.author_id == user_id, Comment.created_at >= cutoff)
-        .group_by(Post.community_id)
-    )
-    comment_res = await db.execute(comment_stmt)
-    comment_counts = {row[0]: row[1] for row in comment_res.all()}
-
-    # C. Posts created by user
-    post_stmt = (
-        select(Post.community_id, func.count(Post.id))
-        .where(Post.author_id == user_id, Post.created_at >= cutoff)
-        .group_by(Post.community_id)
-    )
-    post_res = await db.execute(post_stmt)
-    post_counts = {row[0]: row[1] for row in post_res.all()}
-
-    # Combine community scores (Votes: 1x, Comments: 2x, Posts: 3x)
-    all_community_ids = set(vote_counts.keys()) | set(comment_counts.keys()) | set(post_counts.keys())
-    community_scores = {}
-    for cid in all_community_ids:
-        score = (vote_counts.get(cid, 0) * 1) + (comment_counts.get(cid, 0) * 2) + (post_counts.get(cid, 0) * 3)
-        if score > 0:
-            community_scores[cid] = score
-
-    # Base query for all active posts in caller's university
     comment_count_col = _comment_count_subquery(Post.id)
     thread_total_col = _thread_total_parts_subquery(Post.thread_id)
 
@@ -629,36 +588,78 @@ async def get_for_you_feed(
     count_res = await db.execute(count_stmt)
     total_count = count_res.scalar_one() or 0
 
-    # If user has NO engagement history at all, fallback to pure recency feed
-    if not community_scores:
-        query = base_query.order_by(Post.created_at.desc()).offset((page - 1) * size).limit(size)
-        res = await db.execute(query)
-        rows = res.all()
-        enriched = [
-            EnrichedPost(
-                post=row[0],
-                author_username=row[1],
-                comment_count=row[2],
-                thread_total_parts=row[3] or 1
+    community_scores = {}
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+        # 1. Votes by user on posts
+        vote_stmt = (
+            select(Post.community_id, func.count(Vote.id))
+            .join(Post, Post.id == Vote.target_id)
+            .where(
+                Vote.user_id == user_id,
+                Vote.target_type == "post",
+                Vote.created_at >= cutoff
             )
-            for row in rows
-        ]
-        return enriched, total_count
+            .group_by(Post.community_id)
+        )
+        vote_res = await db.execute(vote_stmt)
+        vote_counts = {row[0]: row[1] for row in vote_res.all()}
 
-    # Build CASE expression for community affinity score
-    community_case_w = []
-    for cid, weight in community_scores.items():
-        community_case_w.append((Post.community_id == cid, weight))
+        # 2. Comments by user
+        comment_stmt = (
+            select(Post.community_id, func.count(Comment.id))
+            .join(Post, Post.id == Comment.post_id)
+            .where(
+                Comment.author_id == user_id,
+                Comment.created_at >= cutoff,
+                Comment.is_deleted == False
+            )
+            .group_by(Post.community_id)
+        )
+        comment_res = await db.execute(comment_stmt)
+        comment_counts = {row[0]: row[1] for row in comment_res.all()}
 
-    community_affinity = case(*community_case_w, else_=0)
+        # 3. Posts created by user
+        post_stmt = (
+            select(Post.community_id, func.count(Post.id))
+            .where(
+                Post.author_id == user_id,
+                Post.created_at >= cutoff,
+                Post.is_deleted == False
+            )
+            .group_by(Post.community_id)
+        )
+        post_res = await db.execute(post_stmt)
+        post_counts = {row[0]: row[1] for row in post_res.all()}
 
-    # Order by user's personal community affinity DESC, then recency DESC
-    query = (
-        base_query
-        .order_by(community_affinity.desc(), Post.created_at.desc())
-        .offset((page - 1) * size)
-        .limit(size)
-    )
+        # Combine community scores (Votes: 1x, Comments: 2x, Posts: 3x)
+        all_community_ids = set(vote_counts.keys()) | set(comment_counts.keys()) | set(post_counts.keys())
+        for cid in all_community_ids:
+            score = (vote_counts.get(cid, 0) * 1) + (comment_counts.get(cid, 0) * 2) + (post_counts.get(cid, 0) * 3)
+            if score > 0:
+                community_scores[cid] = score
+    except Exception as e:
+        # Log and safely fall back to pure recency
+        print(f"Error calculating user affinity scores: {e}")
+
+    # Build query
+    if community_scores:
+        w_tuples = [(Post.community_id == cid, weight) for cid, weight in community_scores.items()]
+        community_affinity = case(*w_tuples, else_=0)
+        query = (
+            base_query
+            .order_by(community_affinity.desc(), Post.created_at.desc())
+            .offset((page - 1) * size)
+            .limit(size)
+        )
+    else:
+        query = (
+            base_query
+            .order_by(Post.created_at.desc())
+            .offset((page - 1) * size)
+            .limit(size)
+        )
 
     result = await db.execute(query)
     rows = result.all()
