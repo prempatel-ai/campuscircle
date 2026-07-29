@@ -44,30 +44,18 @@ export default function SignupPage() {
       <main className="min-h-screen bg-background text-ink flex items-center justify-center p-6">
         <div className="w-full max-w-md bg-surface border border-border-muted rounded-2xl p-8 space-y-6 shadow-sm text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary mb-2">
-            <svg
-              className="w-8 h-8"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 19v-8.93a2 2 0 01.89-1.664l8-4a2 2 0 011.664 0l8 4A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-2.25-1.5a2 2 0 00-1 0l-2.25 1.5"
-              />
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="font-display text-3xl font-bold text-primary">Verify Your Email</h1>
+          <h1 className="font-display text-3xl font-bold text-primary">Account Created!</h1>
           <p className="font-sans text-base text-ink/85 leading-relaxed">
-            We've sent a verification link to <span className="font-semibold text-primary">{email}</span>. 
-            Please check your inbox (and spam folder) and click the link to activate your account.
+            Your academic email <span className="font-semibold text-primary">{email}</span> has been verified. You can log in right away.
           </p>
           <div className="pt-4">
             <Link
               href="/login"
-              className="inline-block w-full py-3 bg-primary hover:bg-primary/90 text-surface font-sans font-semibold rounded-xl text-center transition-colors"
+              className="inline-block w-full py-3 bg-primary hover:bg-primary/95 text-surface font-sans font-semibold rounded-xl text-center transition-all shadow-sm"
             >
               Proceed to Login
             </Link>

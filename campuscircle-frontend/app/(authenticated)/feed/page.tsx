@@ -8,6 +8,7 @@ import { CommunityTabs } from "@/components/CommunityTabs";
 import { PostCard } from "@/components/PostCard";
 import { PostCardSkeleton } from "@/components/PostCardSkeleton";
 import { ComposePost } from "@/components/ComposePost";
+import { CreateCommunityDialog } from "@/components/CreateCommunityDialog";
 
 interface Community {
   id: string;
@@ -60,6 +61,8 @@ function FeedContent() {
   const [isCommunitiesLoading, setIsCommunitiesLoading] = useState(true);
   const [isPostsLoading, setIsPostsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [isCreatingCommunity, setIsCreatingCommunity] = useState(false);
 
   // 1. Fetch Communities on Mount
   useEffect(() => {
@@ -164,18 +167,19 @@ function FeedContent() {
   const handleCommunityCreated = (newCommunity: Community) => {
     setCommunities((prev) => [...prev, newCommunity]);
     setSelectedCommunityId(newCommunity.id);
+    setIsCreatingCommunity(false);
   };
 
   return (
     <div className="flex-1 text-ink font-sans flex flex-col lg:flex-row lg:gap-8 pb-16">
       {/* Community Tabs (Mobile Horizontal Bar + Desktop Left Sidebar) */}
-      {!isCommunitiesLoading && communities.length > 0 && (
+      {!isCommunitiesLoading && (
         <CommunityTabs
           communities={communities}
           selectedId={selectedCommunityId}
           onSelect={handleSelectCommunity}
           onCommunityCreated={handleCommunityCreated}
-          onComposePost={() => setIsComposing(true)}
+          onComposePost={selectedCommunityId ? () => setIsComposing(true) : undefined}
         />
       )}
 
@@ -232,11 +236,28 @@ function FeedContent() {
         )}
 
         {!isCommunitiesLoading && communities.length === 0 && !error && (
-          <div className="bg-surface border border-border-muted rounded-2xl p-8 text-center space-y-4">
-            <h2 className="font-display text-xl font-bold text-primary">No Communities Found</h2>
-            <p className="font-sans text-sm text-ink/75">
-              Your university doesn't have any communities setup yet. Use the "+ New" button above to create one.
-            </p>
+          <div className="bg-surface border border-border-muted rounded-2xl p-8 text-center space-y-4 shadow-2xs">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-1">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <div className="space-y-1">
+              <h2 className="font-display text-xl font-bold text-primary">No Communities Found</h2>
+              <p className="font-sans text-sm text-ink/75 max-w-sm mx-auto">
+                Your university doesn't have any communities set up yet. Create the first community to kick off discussions!
+              </p>
+            </div>
+            <button
+              id="empty-state-new-community-btn"
+              onClick={() => setIsCreatingCommunity(true)}
+              className="px-6 py-2.5 bg-primary hover:bg-[#1F3E23] text-surface font-sans font-bold text-sm rounded-xl shadow-sm hover:-translate-y-[1px] transition-all cursor-pointer inline-flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              Create First Community
+            </button>
           </div>
         )}
 
@@ -332,6 +353,14 @@ function FeedContent() {
           }
           onSuccess={handlePostCreated}
           onClose={() => setIsComposing(false)}
+        />
+      )}
+
+      {/* Create Community Modal */}
+      {isCreatingCommunity && (
+        <CreateCommunityDialog
+          onSuccess={handleCommunityCreated}
+          onClose={() => setIsCreatingCommunity(false)}
         />
       )}
     </div>
