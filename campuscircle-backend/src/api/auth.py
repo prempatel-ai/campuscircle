@@ -3,7 +3,7 @@ import time
 from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from src.database import get_db
 from src.models.user import User
@@ -363,7 +363,7 @@ async def forgot_password(
     db: AsyncSession = Depends(get_db)
 ):
     email = payload.email.strip().lower()
-    stmt = select(User).where(User.email == email)
+    stmt = select(User).where(func.lower(User.email) == email)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
