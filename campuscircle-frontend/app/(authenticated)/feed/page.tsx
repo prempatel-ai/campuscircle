@@ -199,23 +199,25 @@ function FeedContent() {
   };
 
   return (
-    <div className="flex-1 text-ink font-sans flex flex-col lg:flex-row lg:gap-8 pb-16">
-      {/* Community Tabs Sidebar */}
-      {!isCommunitiesLoading && (
-        <CommunityTabs
-          communities={communities}
-          selectedId={selectedCommunityId}
-          onSelect={handleSelectCommunity}
-          onCommunityCreated={handleCommunityCreated}
-          onComposePost={selectedCommunityId ? () => setIsComposing(true) : undefined}
-        />
-      )}
+    <div className="flex-1 text-ink font-sans grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 py-6 items-start pb-16">
+      {/* 1. Left Sidebar Column (3 cols on desktop) */}
+      <div className="lg:col-span-3 lg:sticky lg:top-20">
+        {!isCommunitiesLoading && (
+          <CommunityTabs
+            communities={communities}
+            selectedId={selectedCommunityId}
+            onSelect={handleSelectCommunity}
+            onCommunityCreated={handleCommunityCreated}
+            onComposePost={selectedCommunityId ? () => setIsComposing(true) : undefined}
+          />
+        )}
+      </div>
 
-      {/* Main Feed Column */}
-      <div className="flex-1 max-w-2xl w-full mx-auto lg:mx-0 px-4 lg:px-0 mt-6 flex flex-col space-y-6">
+      {/* 2. Main Center Feed Column (6 cols on desktop) */}
+      <div className="lg:col-span-6 w-full flex flex-col space-y-6">
         {/* Active Tag Filter Banner */}
         {tagQueryParam && (
-          <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex items-center justify-between">
+          <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
             <div className="flex items-center gap-2">
               <span className="text-sm font-sans text-ink/80">Filtering posts tagged:</span>
               <span className="font-mono text-sm font-bold text-primary">#{tagQueryParam}</span>
@@ -276,12 +278,12 @@ function FeedContent() {
 
         {/* Feed Sort Tabs: For You, New, Hot, Top */}
         {!isCommunitiesLoading && (communities.length > 0 || sort === "for-you") && !error && (
-          <div className="flex bg-surface rounded-xl p-1 border border-border-muted max-w-sm mx-auto w-full">
+          <div className="flex bg-surface rounded-xl p-1 border border-border-muted w-full shadow-2xs">
             {SORT_OPTIONS.map((s) => (
               <button
                 key={s}
                 onClick={() => setSort(s)}
-                className={`flex-1 py-1.5 text-xs font-mono font-bold capitalize rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 py-2 text-xs font-mono font-bold capitalize rounded-lg transition-all cursor-pointer ${
                   sort === s
                     ? "bg-primary text-surface shadow-sm"
                     : "text-ink/60 hover:text-ink"
@@ -307,7 +309,7 @@ function FeedContent() {
             )}
 
             {!isPostsLoading && posts.length === 0 && (
-              <div className="bg-surface border border-border-muted rounded-2xl p-10 text-center space-y-3">
+              <div className="bg-surface border border-border-muted rounded-2xl p-10 text-center space-y-3 shadow-2xs">
                 <h3 className="font-display text-lg font-bold text-primary">Nothing here yet</h3>
                 <p className="font-sans text-sm text-ink/75 max-w-xs mx-auto">
                   {tagQueryParam
@@ -326,7 +328,7 @@ function FeedContent() {
             {!isPostsLoading && hasMore && (
               <button
                 onClick={handleLoadMore}
-                className="w-full py-3 bg-surface border border-border-muted text-ink/75 hover:bg-background font-sans font-semibold rounded-xl text-center transition-all cursor-pointer shadow-sm text-sm"
+                className="w-full py-3 bg-surface border border-border-muted text-ink/75 hover:bg-background font-sans font-semibold rounded-xl text-center transition-all cursor-pointer shadow-2xs text-sm"
               >
                 Load More
               </button>
@@ -335,9 +337,19 @@ function FeedContent() {
         )}
       </div>
 
-      {/* Trending Tags Sidebar (Desktop Right Column) */}
-      <div className="hidden lg:block w-72 shrink-0 mt-6">
+      {/* 3. Right Sidebar Column (3 cols on desktop) */}
+      <div className="hidden lg:flex lg:col-span-3 flex-col gap-5 lg:sticky lg:top-20">
         <TrendingTags activeTag={tagQueryParam} onSelectTag={handleSelectTag} />
+
+        {/* Campus Accountability Card */}
+        <div className="bg-surface border border-border-muted rounded-2xl p-5 space-y-3 shadow-2xs">
+          <h3 className="font-display text-sm font-bold text-primary flex items-center gap-1.5">
+            <span>🛡️</span> Campus Accountability
+          </h3>
+          <p className="font-sans text-xs text-ink/75 leading-relaxed">
+            CampusCircle pairs verified student emails with pseudonymous handles. Be candid, respectful, and helpful to your peers.
+          </p>
+        </div>
       </div>
 
       {/* Compose Dialog */}

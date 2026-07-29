@@ -54,7 +54,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     <div className="min-h-screen bg-background text-ink font-sans flex flex-col">
       {/* Shared Persistent Top Header */}
       <header className="bg-surface border-b border-border-muted px-4 py-3 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-2 sm:px-4">
           {/* Logo / Wordmark */}
           <Link
             href="/feed"
@@ -155,7 +155,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       </header>
 
       {/* Main Page Children Container */}
-      <main className="flex-1 w-full max-w-5xl mx-auto flex flex-col">{children}</main>
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col">{children}</main>
     </div>
   );
 };

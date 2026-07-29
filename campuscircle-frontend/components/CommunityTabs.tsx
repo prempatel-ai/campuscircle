@@ -70,7 +70,7 @@ export const CommunityTabs: React.FC<CommunityTabsProps> = ({
       </div>
 
       {/* ── 2. DESKTOP PERSISTENT LEFT SIDEBAR (>= lg) ── */}
-      <aside className="hidden lg:flex flex-col w-64 shrink-0 sticky top-[73px] pt-6 gap-6">
+      <aside className="hidden lg:flex flex-col w-full gap-5">
         {/* Desktop "+ New Post" primary action button */}
         {onComposePost && (
           <button
