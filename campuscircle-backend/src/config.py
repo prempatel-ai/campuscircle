@@ -21,8 +21,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
 
-    # SMTP / Email Configuration (Supports Gmail SMTP, Brevo, SendGrid, Resend)
-    smtp_server: str = "smtp.gmail.com"
+    # Email Configuration (Supports Brevo API, SMTP, Resend)
+    brevo_api_key: str = ""
+    smtp_server: str = "smtp-relay.brevo.com"
     smtp_port: int = 587
     smtp_username: str = ""
     smtp_password: str = ""

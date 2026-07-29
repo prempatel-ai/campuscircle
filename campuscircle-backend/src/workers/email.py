@@ -1,5 +1,5 @@
 """
-Email delivery worker module supporting SMTP (Gmail App Password, Brevo, SendGrid), Resend API, and local dev stub fallback.
+Email delivery worker module supporting Brevo API, SMTP Relay, Resend API, and local dev stub fallback.
 """
 import logging
 import smtplib
@@ -10,93 +10,50 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 
-def diagnose_email_sending(to_email: str) -> dict:
+def _send_via_brevo_api(to_email: str, subject: str, html_content: str) -> tuple[bool, str]:
     """
-    Executes a test email send synchronously and returns detailed diagnostic results.
+    Delivers email via Brevo REST HTTP API (https://api.brevo.com/v3/smtp/email).
+    Uses standard HTTPS, bypassing all SMTP port blocking on cloud hosts.
     """
-    results = {
-        "smtp_configured": bool(settings.smtp_username and settings.smtp_password),
-        "resend_configured": bool(settings.resend_api_key),
-        "smtp_server": settings.smtp_server,
-        "smtp_port": settings.smtp_port,
-        "smtp_username": settings.smtp_username if settings.smtp_username else "NOT_SET",
-        "methods_tried": [],
-        "status": "pending",
-        "details": ""
+    if not settings.brevo_api_key or not settings.brevo_api_key.strip():
+        return False, "BREVO_API_KEY not configured"
+
+    sender_email = settings.from_email_address.strip() if settings.from_email_address else "no-reply@campuscircle.app"
+    sender_name = "CampusCircle"
+
+    payload = {
+        "sender": {"name": sender_name, "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_content
     }
 
-    subject = "CampusCircle Email Delivery Test"
-    text_content = "This is a test email from CampusCircle to verify email delivery configurations."
-    html_content = "<h2>CampusCircle Email Test</h2><p>This is a test email confirming email delivery is active!</p>"
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": settings.brevo_api_key.strip()
+    }
 
-    # 1. Try SMTP if configured
-    if settings.smtp_username and settings.smtp_password:
-        results["methods_tried"].append("smtp")
-        sender = settings.from_email_address.strip() or settings.smtp_username.strip()
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = sender
-        msg["To"] = to_email
-        msg.attach(MIMEText(text_content, "plain"))
-        msg.attach(MIMEText(html_content, "html"))
-
-        # Render free tier blocks outbound port 587, so we try SSL port 465 first!
-        try:
-            with smtplib.SMTP_SSL(settings.smtp_server, 465, timeout=10) as server:
-                server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
-                server.sendmail(sender, [to_email], msg.as_string())
-            results["status"] = "success"
-            results["details"] = f"Successfully delivered email to {to_email} via SMTP SSL (port 465)"
-            return results
-        except Exception as ssl_err:
-            logger.warning(f"SMTP SSL 465 failed, trying port {settings.smtp_port}: {ssl_err}")
-            try:
-                with smtplib.SMTP(settings.smtp_server, settings.smtp_port, timeout=10) as server:
-                    server.starttls()
-                    server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
-                    server.sendmail(sender, [to_email], msg.as_string())
-                results["status"] = "success"
-                results["details"] = f"Successfully delivered email to {to_email} via SMTP STARTTLS (port {settings.smtp_port})"
-                return results
-            except Exception as e:
-                results["smtp_error"] = f"SSL 465 error: {str(ssl_err)} | STARTTLS {settings.smtp_port} error: {str(e)}"
-                logger.error(f"SMTP diagnostic failed: {results['smtp_error']}", exc_info=True)
-
-    # 2. Try Resend API if configured
-    if settings.resend_api_key and settings.resend_api_key.strip():
-        results["methods_tried"].append("resend")
-        try:
-            import resend
-            resend.api_key = settings.resend_api_key.strip()
-            sender = settings.from_email_address.strip() or "onboarding@resend.dev"
-            params: resend.Emails.SendParams = {
-                "from": sender,
-                "to": [to_email],
-                "subject": subject,
-                "html": html_content,
-            }
-            res = resend.Emails.send(params)
-            email_id = getattr(res, "id", None) or (res.get("id") if isinstance(res, dict) else "sent")
-            results["status"] = "success"
-            results["details"] = f"Successfully delivered email to {to_email} via Resend API (ID: {email_id})"
-            return results
-        except Exception as e:
-            results["resend_error"] = str(e)
-            logger.error(f"Resend diagnostic failed: {str(e)}", exc_info=True)
-
-    # 3. Fallback to Local Dev Stub
-    results["methods_tried"].append("stub")
-    results["status"] = "stubbed"
-    results["details"] = (
-        "Neither SMTP nor Resend API credentials are valid/configured on Render. "
-        "The system logged the email to server logs instead of sending a physical email."
-    )
-    return results
+    try:
+        import httpx
+        with httpx.Client(timeout=10.0) as client:
+            response = client.post("https://api.brevo.com/v3/smtp/email", json=payload, headers=headers)
+            if response.status_code in (200, 201, 202):
+                logger.info(f"Email successfully sent to {to_email} via Brevo HTTP API.")
+                return True, f"Delivered via Brevo API: {response.text}"
+            else:
+                err_msg = f"Brevo API returned status {response.status_code}: {response.text}"
+                logger.error(err_msg)
+                return False, err_msg
+    except Exception as e:
+        err_msg = f"Brevo API exception: {str(e)}"
+        logger.error(err_msg, exc_info=True)
+        return False, err_msg
 
 
-def _send_via_smtp(to_email: str, subject: str, html_content: str, text_content: str) -> bool:
+def _send_via_smtp(to_email: str, subject: str, html_content: str, text_content: str) -> tuple[bool, str]:
     if not settings.smtp_username or not settings.smtp_password:
-        return False
+        return False, "SMTP credentials not configured"
 
     sender = settings.from_email_address.strip() or settings.smtp_username.strip()
 
@@ -107,32 +64,33 @@ def _send_via_smtp(to_email: str, subject: str, html_content: str, text_content:
     msg.attach(MIMEText(text_content, "plain"))
     msg.attach(MIMEText(html_content, "html"))
 
-    # Render free tier blocks outbound port 587, so we try SSL port 465 first
+    # Try SSL port 465 first
     try:
         with smtplib.SMTP_SSL(settings.smtp_server, 465, timeout=10) as server:
             server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
             server.sendmail(sender, [to_email], msg.as_string())
-        logger.info(f"Email successfully sent to {to_email} via SMTP_SSL (port 465).")
-        return True
+        logger.info(f"Email sent to {to_email} via SMTP SSL (port 465).")
+        return True, "Delivered via SMTP SSL 465"
     except Exception as ssl_err:
-        logger.warning(f"SMTP SSL 465 failed, trying STARTTLS port {settings.smtp_port}: {ssl_err}")
+        logger.warning(f"SMTP SSL 465 failed: {ssl_err}")
 
-    # Fallback to STARTTLS port 587
+    # Try STARTTLS port 587
     try:
         with smtplib.SMTP(settings.smtp_server, settings.smtp_port, timeout=10) as server:
             server.starttls()
             server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
             server.sendmail(sender, [to_email], msg.as_string())
-        logger.info(f"Email successfully sent to {to_email} via STARTTLS (port {settings.smtp_port}).")
-        return True
+        logger.info(f"Email sent to {to_email} via STARTTLS (port {settings.smtp_port}).")
+        return True, f"Delivered via SMTP STARTTLS {settings.smtp_port}"
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email} via SMTP: {str(e)}", exc_info=True)
-        return False
+        err_msg = f"SMTP failed: {str(e)}"
+        logger.error(err_msg, exc_info=True)
+        return False, err_msg
 
 
-def _send_via_resend(to_email: str, subject: str, html_content: str) -> bool:
+def _send_via_resend(to_email: str, subject: str, html_content: str) -> tuple[bool, str]:
     if not settings.resend_api_key or not settings.resend_api_key.strip():
-        return False
+        return False, "RESEND_API_KEY not configured"
 
     try:
         import resend
@@ -149,10 +107,68 @@ def _send_via_resend(to_email: str, subject: str, html_content: str) -> bool:
         response = resend.Emails.send(params)
         email_id = getattr(response, "id", None) or (response.get("id") if isinstance(response, dict) else "sent")
         logger.info(f"Email sent to {to_email} via Resend API. ID: {email_id}")
-        return True
+        return True, f"Delivered via Resend ID: {email_id}"
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email} via Resend: {str(e)}", exc_info=True)
-        return False
+        err_msg = f"Resend API exception: {str(e)}"
+        logger.error(err_msg, exc_info=True)
+        return False, err_msg
+
+
+def diagnose_email_sending(to_email: str) -> dict:
+    """
+    Executes a test email send synchronously and returns detailed diagnostic results.
+    """
+    results = {
+        "brevo_configured": bool(settings.brevo_api_key),
+        "smtp_configured": bool(settings.smtp_username and settings.smtp_password),
+        "resend_configured": bool(settings.resend_api_key),
+        "methods_tried": [],
+        "status": "pending",
+        "details": ""
+    }
+
+    subject = "CampusCircle Email Delivery Test"
+    text_content = "This is a test email from CampusCircle to verify email delivery configurations."
+    html_content = "<h2>CampusCircle Email Test</h2><p>This is a test email confirming Brevo email delivery is active!</p>"
+
+    # 1. Try Brevo API first
+    if settings.brevo_api_key:
+        results["methods_tried"].append("brevo_api")
+        ok, msg = _send_via_brevo_api(to_email, subject, html_content)
+        if ok:
+            results["status"] = "success"
+            results["details"] = msg
+            return results
+        results["brevo_error"] = msg
+
+    # 2. Try SMTP second
+    if settings.smtp_username and settings.smtp_password:
+        results["methods_tried"].append("smtp")
+        ok, msg = _send_via_smtp(to_email, subject, html_content, text_content)
+        if ok:
+            results["status"] = "success"
+            results["details"] = msg
+            return results
+        results["smtp_error"] = msg
+
+    # 3. Try Resend API third
+    if settings.resend_api_key:
+        results["methods_tried"].append("resend")
+        ok, msg = _send_via_resend(to_email, subject, html_content)
+        if ok:
+            results["status"] = "success"
+            results["details"] = msg
+            return results
+        results["resend_error"] = msg
+
+    # Fallback to Stub
+    results["methods_tried"].append("stub")
+    results["status"] = "stubbed"
+    results["details"] = (
+        "No email service credentials (BREVO_API_KEY, SMTP_USERNAME, or RESEND_API_KEY) are configured on Render. "
+        "The system logged the verification email to server logs."
+    )
+    return results
 
 
 def send_verification_email(email: str, token: str) -> None:
@@ -177,14 +193,22 @@ def send_verification_email(email: str, token: str) -> None:
     </div>
     """
 
-    if _send_via_smtp(email, subject, html_content, text_content):
+    # 1. Try Brevo API first
+    ok, _ = _send_via_brevo_api(email, subject, html_content)
+    if ok:
         return
 
-    if _send_via_resend(email, subject, html_content):
+    # 2. Try SMTP
+    ok, _ = _send_via_smtp(email, subject, html_content, text_content)
+    if ok:
         return
 
-    logger.info(f"[LOCAL DEV STUB] Sending email verification to {email}")
-    logger.info(f"[LOCAL DEV STUB] Verification Link: {verification_link}")
+    # 3. Try Resend
+    ok, _ = _send_via_resend(email, subject, html_content)
+    if ok:
+        return
+
+    logger.info(f"[LOCAL DEV STUB] Verification Link for {email}: {verification_link}")
     print(f"[LOCAL DEV STUB] Verification Link for {email}: {verification_link}")
 
 
@@ -211,12 +235,20 @@ def send_password_reset_email(email: str, token: str) -> None:
     </div>
     """
 
-    if _send_via_smtp(email, subject, html_content, text_content):
+    # 1. Try Brevo API first
+    ok, _ = _send_via_brevo_api(email, subject, html_content)
+    if ok:
         return
 
-    if _send_via_resend(email, subject, html_content):
+    # 2. Try SMTP
+    ok, _ = _send_via_smtp(email, subject, html_content, text_content)
+    if ok:
         return
 
-    logger.info(f"[LOCAL DEV STUB] Sending password reset to {email}")
-    logger.info(f"[LOCAL DEV STUB] Reset Link: {reset_link}")
-    print(f"[LOCAL DEV STUB] Password Reset Link for {email}: {reset_link}")
+    # 3. Try Resend
+    ok, _ = _send_via_resend(email, subject, html_content)
+    if ok:
+        return
+
+    logger.info(f"[LOCAL DEV STUB] Reset Link for {email}: {reset_link}")
+    print(f"[LOCAL DEV STUB] Reset Link for {email}: {reset_link}")
