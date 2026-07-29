@@ -9,6 +9,7 @@ import { PostCard } from "@/components/PostCard";
 import { PostCardSkeleton } from "@/components/PostCardSkeleton";
 import { ComposePost } from "@/components/ComposePost";
 import { CreateCommunityDialog } from "@/components/CreateCommunityDialog";
+import { TrendingTags } from "@/components/TrendingTags";
 
 interface Community {
   id: string;
@@ -39,7 +40,9 @@ interface PaginatedResponse<T> {
   size: number;
 }
 
-const SORT_OPTIONS: ("hot" | "top" | "new")[] = ["hot", "top", "new"];
+type SortType = "for-you" | "new" | "hot" | "top";
+
+const SORT_OPTIONS: SortType[] = ["for-you", "new", "hot", "top"];
 const PAGE_SIZE = 10;
 
 function FeedContent() {
@@ -48,12 +51,13 @@ function FeedContent() {
   const searchParams = useSearchParams();
 
   const communityQueryParam = searchParams.get("community");
+  const tagQueryParam = searchParams.get("tag");
 
   const [communities, setCommunities] = useState<Community[]>([]);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
 
   const [posts, setPosts] = useState<Post[]>([]);
-  const [sort, setSort] = useState<"hot" | "top" | "new">("new");
+  const [sort, setSort] = useState<SortType>("for-you");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [isComposing, setIsComposing] = useState(false);
@@ -88,7 +92,7 @@ function FeedContent() {
     fetchCommunities();
   }, [isAuthenticated]);
 
-  // 2. Sync selectedCommunityId with URL query param + communities list
+  // 2. Sync selectedCommunityId with URL query param
   useEffect(() => {
     if (communities.length === 0) return;
 
@@ -100,34 +104,60 @@ function FeedContent() {
       }
     }
 
-    // Default to first community if missing or invalid param
     const firstId = communities[0].id;
     setSelectedCommunityId(firstId);
-    router.replace(`/feed?community=${firstId}`, { scroll: false });
-  }, [communities, communityQueryParam, router]);
+  }, [communities, communityQueryParam]);
 
   // 3. Tab Select Handler — updates URL via router.push
   const handleSelectCommunity = (id: string) => {
     setSelectedCommunityId(id);
-    router.push(`/feed?community=${id}`, { scroll: false });
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("community", id);
+    router.push(`/feed?${params.toString()}`, { scroll: false });
   };
 
-  // 2. Fetch Posts callback
+  const handleSelectTag = (tag: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tag) {
+      params.set("tag", tag);
+    } else {
+      params.delete("tag");
+    }
+    router.push(`/feed?${params.toString()}`, { scroll: false });
+  };
+
+  // 4. Fetch Posts callback
   const fetchPosts = useCallback(
-    async (communityId: string, currentSort: "hot" | "top" | "new", currentPage: number, append = false) => {
+    async (
+      communityId: string | null,
+      currentSort: SortType,
+      currentPage: number,
+      activeTag: string | null,
+      append = false
+    ) => {
       setIsPostsLoading(true);
       setError(null);
       try {
-        const response = await apiRequest<PaginatedResponse<Post>>(
-          `/api/v1/communities/${communityId}/posts?sort=${currentSort}&page=${currentPage}&size=${PAGE_SIZE}`
-        );
-        
+        let endpoint = "";
+        if (currentSort === "for-you") {
+          endpoint = `/api/v1/feed/for-you?page=${currentPage}&size=${PAGE_SIZE}`;
+        } else if (communityId) {
+          endpoint = `/api/v1/communities/${communityId}/posts?sort=${currentSort}&page=${currentPage}&size=${PAGE_SIZE}${
+            activeTag ? `&tag=${encodeURIComponent(activeTag)}` : ""
+          }`;
+        } else {
+          setIsPostsLoading(false);
+          return;
+        }
+
+        const response = await apiRequest<PaginatedResponse<Post>>(endpoint);
+
         if (append) {
           setPosts((prev) => [...prev, ...response.items]);
         } else {
           setPosts(response.items);
         }
-        
+
         setHasMore(currentPage * PAGE_SIZE < response.total);
       } catch (err) {
         if (err instanceof ApiError) {
@@ -142,28 +172,26 @@ function FeedContent() {
     []
   );
 
-  // 3. Trigger Post fetch when community or sort changes
+  // 5. Trigger Post fetch when community, sort, or tag changes
   useEffect(() => {
-    if (!selectedCommunityId) return;
+    if (sort !== "for-you" && !selectedCommunityId) return;
     setPage(1);
-    fetchPosts(selectedCommunityId, sort, 1, false);
-  }, [selectedCommunityId, sort, fetchPosts]);
+    fetchPosts(selectedCommunityId, sort, 1, tagQueryParam, false);
+  }, [selectedCommunityId, sort, tagQueryParam, fetchPosts]);
 
-  // 4. Load More handler
+  // 6. Load More handler
   const handleLoadMore = () => {
-    if (!selectedCommunityId || isPostsLoading) return;
+    if (isPostsLoading || !hasMore) return;
     const nextPage = page + 1;
     setPage(nextPage);
-    fetchPosts(selectedCommunityId, sort, nextPage, true);
+    fetchPosts(selectedCommunityId, sort, nextPage, tagQueryParam, true);
   };
 
-  // 5. Handle new post created — prepend to list without refresh
   const handlePostCreated = (newPost: Post) => {
     setPosts((prev) => [newPost, ...prev]);
     setIsComposing(false);
   };
 
-  // 6. Handle new community created — append tab and auto-select it
   const handleCommunityCreated = (newCommunity: Community) => {
     setCommunities((prev) => [...prev, newCommunity]);
     setSelectedCommunityId(newCommunity.id);
@@ -172,7 +200,7 @@ function FeedContent() {
 
   return (
     <div className="flex-1 text-ink font-sans flex flex-col lg:flex-row lg:gap-8 pb-16">
-      {/* Community Tabs (Mobile Horizontal Bar + Desktop Left Sidebar) */}
+      {/* Community Tabs Sidebar */}
       {!isCommunitiesLoading && (
         <CommunityTabs
           communities={communities}
@@ -183,47 +211,42 @@ function FeedContent() {
         />
       )}
 
-      {/* Main Feed Content Column */}
+      {/* Main Feed Column */}
       <div className="flex-1 max-w-2xl w-full mx-auto lg:mx-0 px-4 lg:px-0 mt-6 flex flex-col space-y-6">
-        {/* Error State with Retry */}
+        {/* Active Tag Filter Banner */}
+        {tagQueryParam && (
+          <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-sans text-ink/80">Filtering posts tagged:</span>
+              <span className="font-mono text-sm font-bold text-primary">#{tagQueryParam}</span>
+            </div>
+            <button
+              onClick={() => handleSelectTag(null)}
+              className="text-xs font-sans text-primary hover:underline font-bold cursor-pointer"
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
+
+        {/* Error State */}
         {error && (
           <div className="bg-surface border border-red-200 rounded-2xl p-6 text-center space-y-4 shadow-sm">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 text-red-600 mb-1">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <div className="space-y-1">
-              <h3 className="font-display text-lg font-bold text-red-700">Couldn't load feed</h3>
-              <p className="font-sans text-sm text-ink/75 max-w-xs mx-auto">{error}</p>
-            </div>
+            <h3 className="font-display text-lg font-bold text-red-700">Couldn't load feed</h3>
+            <p className="font-sans text-sm text-ink/75 max-w-xs mx-auto">{error}</p>
             <button
               onClick={() => {
                 setError(null);
-                if (communities.length === 0) {
-                  setIsCommunitiesLoading(true);
-                  apiRequest<PaginatedResponse<Community>>("/api/v1/communities?page=1&size=100")
-                    .then((res) => {
-                      setCommunities(res.items);
-                      if (res.items.length > 0) setSelectedCommunityId(res.items[0].id);
-                    })
-                    .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load communities."))
-                    .finally(() => setIsCommunitiesLoading(false));
-                } else if (selectedCommunityId) {
-                  fetchPosts(selectedCommunityId, sort, 1, false);
-                }
+                fetchPosts(selectedCommunityId, sort, 1, tagQueryParam, false);
               }}
-              className="px-6 py-2.5 bg-primary hover:bg-primary/95 text-surface font-sans font-semibold rounded-xl text-sm transition-all cursor-pointer inline-flex items-center gap-2"
+              className="px-6 py-2.5 bg-primary text-surface font-sans font-semibold rounded-xl text-sm"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
               Try Again
             </button>
           </div>
         )}
 
-        {/* Communities Loading State (Skeletons) */}
+        {/* Communities Loading Skeleton */}
         {isCommunitiesLoading && !error && (
           <div className="space-y-4 py-2">
             <div className="h-8 bg-surface border border-border-muted/50 rounded-full animate-pulse max-w-xs mx-auto" />
@@ -235,35 +258,25 @@ function FeedContent() {
           </div>
         )}
 
+        {/* Zero Communities State */}
         {!isCommunitiesLoading && communities.length === 0 && !error && (
           <div className="bg-surface border border-border-muted rounded-2xl p-8 text-center space-y-4 shadow-2xs">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-1">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </div>
-            <div className="space-y-1">
-              <h2 className="font-display text-xl font-bold text-primary">No Communities Found</h2>
-              <p className="font-sans text-sm text-ink/75 max-w-sm mx-auto">
-                Your university doesn't have any communities set up yet. Create the first community to kick off discussions!
-              </p>
-            </div>
+            <h2 className="font-display text-xl font-bold text-primary">No Communities Found</h2>
+            <p className="font-sans text-sm text-ink/75 max-w-sm mx-auto">
+              Your university doesn't have any communities set up yet. Create the first community!
+            </p>
             <button
-              id="empty-state-new-community-btn"
               onClick={() => setIsCreatingCommunity(true)}
-              className="px-6 py-2.5 bg-primary hover:bg-[#1F3E23] text-surface font-sans font-bold text-sm rounded-xl shadow-sm hover:-translate-y-[1px] transition-all cursor-pointer inline-flex items-center gap-2"
+              className="px-6 py-2.5 bg-primary text-surface font-sans font-bold text-sm rounded-xl"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-              </svg>
               Create First Community
             </button>
           </div>
         )}
 
-        {/* Sort Segmented Control */}
-        {!isCommunitiesLoading && communities.length > 0 && !error && (
-          <div className="flex bg-surface rounded-xl p-1 border border-border-muted max-w-xs mx-auto w-full">
+        {/* Feed Sort Tabs: For You, New, Hot, Top */}
+        {!isCommunitiesLoading && (communities.length > 0 || sort === "for-you") && !error && (
+          <div className="flex bg-surface rounded-xl p-1 border border-border-muted max-w-sm mx-auto w-full">
             {SORT_OPTIONS.map((s) => (
               <button
                 key={s}
@@ -274,16 +287,15 @@ function FeedContent() {
                     : "text-ink/60 hover:text-ink"
                 }`}
               >
-                {s}
+                {s === "for-you" ? "For You" : s}
               </button>
             ))}
           </div>
         )}
 
         {/* Post List */}
-        {!isCommunitiesLoading && selectedCommunityId && !error && (
+        {!isCommunitiesLoading && !error && (
           <div className="flex flex-col space-y-4">
-            {/* Initial Posts Loading Skeleton */}
             {isPostsLoading && page === 1 ? (
               <div className="space-y-4">
                 {[1, 2, 3, 4].map((n) => (
@@ -294,29 +306,23 @@ function FeedContent() {
               posts.map((post) => <PostCard key={post.id} post={post} />)
             )}
 
-            {/* Empty Post State */}
             {!isPostsLoading && posts.length === 0 && (
               <div className="bg-surface border border-border-muted rounded-2xl p-10 text-center space-y-3">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-1">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                </div>
                 <h3 className="font-display text-lg font-bold text-primary">Nothing here yet</h3>
                 <p className="font-sans text-sm text-ink/75 max-w-xs mx-auto">
-                  Be the first to post and spark a discussion in this community!
+                  {tagQueryParam
+                    ? `No posts found tagged #${tagQueryParam}.`
+                    : "Be the first to post and spark a discussion!"}
                 </p>
               </div>
             )}
 
-            {/* Loading Indicator for Next Pages */}
             {isPostsLoading && page > 1 && (
               <div className="flex justify-center py-4">
                 <div className="border-4 border-primary border-t-transparent animate-spin w-8 h-8 rounded-full" />
               </div>
             )}
 
-            {/* Load More Button */}
             {!isPostsLoading && hasMore && (
               <button
                 onClick={handleLoadMore}
@@ -329,38 +335,26 @@ function FeedContent() {
         )}
       </div>
 
-      {/* Floating Action Button — Mobile Only (< lg) */}
-      {!isCommunitiesLoading && selectedCommunityId && (
-        <button
-          id="fab-new-post"
-          onClick={() => setIsComposing(true)}
-          aria-label="New post"
-          className="fixed bottom-6 right-5 z-40 lg:hidden flex items-center gap-2 bg-primary hover:bg-[#1F3E23] active:scale-95 text-white font-sans font-bold text-sm px-5 py-3.5 rounded-full shadow-lg transition-all cursor-pointer"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          Post
-        </button>
-      )}
+      {/* Trending Tags Sidebar (Desktop Right Column) */}
+      <div className="hidden lg:block w-72 shrink-0 mt-6">
+        <TrendingTags activeTag={tagQueryParam} onSelectTag={handleSelectTag} />
+      </div>
 
-      {/* Compose Modal */}
+      {/* Compose Dialog */}
       {isComposing && selectedCommunityId && (
         <ComposePost
           communityId={selectedCommunityId}
-          communityName={
-            communities.find((c) => c.id === selectedCommunityId)?.name ?? "community"
-          }
-          onSuccess={handlePostCreated}
+          communityName={communities.find((c) => c.id === selectedCommunityId)?.name || "community"}
           onClose={() => setIsComposing(false)}
+          onSuccess={handlePostCreated}
         />
       )}
 
-      {/* Create Community Modal */}
+      {/* Create Community Dialog */}
       {isCreatingCommunity && (
         <CreateCommunityDialog
-          onSuccess={handleCommunityCreated}
           onClose={() => setIsCreatingCommunity(false)}
+          onSuccess={handleCommunityCreated}
         />
       )}
     </div>
@@ -371,9 +365,8 @@ export default function FeedPage() {
   return (
     <Suspense
       fallback={
-        <div className="space-y-4 py-6 max-w-2xl mx-auto">
-          <PostCardSkeleton />
-          <PostCardSkeleton />
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="border-4 border-primary border-t-transparent animate-spin w-10 h-10 rounded-full" />
         </div>
       }
     >

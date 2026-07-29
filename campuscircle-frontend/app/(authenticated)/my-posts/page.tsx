@@ -111,7 +111,7 @@ export default function MyPostsPage() {
               ))}
             </div>
           ) : (
-            posts.map((post) => <PostCard key={post.id} post={post} />)
+            posts.map((post) => <PostCard key={post.id} post={post} showAuthorViewCount={true} />)
           )}
 
           {/* Empty State */}
