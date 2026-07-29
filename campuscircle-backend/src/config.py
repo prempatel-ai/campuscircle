@@ -21,9 +21,13 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
 
-    # Resend Email Configuration
+    # SMTP / Email Configuration (Supports Gmail SMTP, Brevo, SendGrid, Resend)
+    smtp_server: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
     resend_api_key: str = ""
-    from_email_address: str = "onboarding@resend.dev"
+    from_email_address: str = ""
     frontend_url: str = "https://campuscircle-pdqa.vercel.app"
 
     # CORS configuration
