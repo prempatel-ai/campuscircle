@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.post import Post
 from src.models.user import User
 from src.models.comment import Comment
+from src.models.tag import Tag, post_tags
+from src.repositories.tag_repository import associate_tags_for_post
 
 
 class EnrichedPost(NamedTuple):
@@ -61,7 +63,8 @@ async def create_post(
     community_id: uuid.UUID,
     author_id: uuid.UUID,
     title: str,
-    content: str
+    content: str,
+    university_id: uuid.UUID | None = None
 ) -> uuid.UUID:
     """
     Create a new post in the specified community.
@@ -77,6 +80,10 @@ async def create_post(
     db.add(post)
     await db.flush()
     new_id = post.id          # capture before commit expires the object
+
+    if university_id:
+        await associate_tags_for_post(db, new_id, university_id, [title, content])
+
     await db.commit()
     return new_id
 
@@ -86,7 +93,8 @@ async def create_thread(
     community_id: uuid.UUID,
     author_id: uuid.UUID,
     title: str,
-    parts: List[str]
+    parts: List[str],
+    university_id: uuid.UUID | None = None
 ) -> List[uuid.UUID]:
     """
     Creates a multi-part thread of posts atomically in ONE transaction.
@@ -105,11 +113,12 @@ async def create_thread(
 
     for idx, part_content in enumerate(parts, start=1):
         post_id = first_post_id if idx == 1 else uuid.uuid4()
+        post_title = title if idx == 1 else f"{title} (Part {idx})"
         post = Post(
             id=post_id,
             community_id=community_id,
             author_id=author_id,
-            title=title if idx == 1 else f"{title} (Part {idx})",
+            title=post_title,
             content=part_content.strip(),
             thread_id=first_post_id,
             thread_position=idx,
@@ -119,6 +128,11 @@ async def create_thread(
 
     db.add_all(posts_to_create)
     await db.flush()
+
+    if university_id:
+        for p in posts_to_create:
+            await associate_tags_for_post(db, p.id, university_id, [p.title, p.content])
+
     await db.commit()
     return created_ids
 
@@ -128,11 +142,13 @@ async def get_posts(
     community_id: uuid.UUID,
     sort: str = "new",
     page: int = 1,
-    size: int = 20
+    size: int = 20,
+    tag: str | None = None
 ) -> Tuple[List[EnrichedPost], int]:
     """
     Retrieve a paginated list of active posts in the specified community.
     Threaded posts appear ONCE in the feed, representing part 1.
+    Supports optional filtering by tag name.
     """
     from sqlalchemy import or_
 
@@ -166,6 +182,22 @@ async def get_posts(
         Post.is_deleted == False,
         or_(Post.thread_position == 1, Post.thread_position.is_(None))
     )
+
+    if tag:
+        tag_norm = tag.strip().lower().lstrip("#")
+        base_query = (
+            base_query
+            .join(post_tags, post_tags.c.post_id == Post.id)
+            .join(Tag, Tag.id == post_tags.c.tag_id)
+            .where(Tag.name == tag_norm)
+        )
+        count_stmt = (
+            count_stmt
+            .join(post_tags, post_tags.c.post_id == Post.id)
+            .join(Tag, Tag.id == post_tags.c.tag_id)
+            .where(Tag.name == tag_norm)
+        )
+
     count_result = await db.execute(count_stmt)
     total_count = count_result.scalar_one() or 0
 

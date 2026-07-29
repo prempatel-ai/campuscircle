@@ -14,6 +14,7 @@ from src.api.posts import router as posts_router, posts_router as posts_detail_r
 from src.api.votes import router as votes_router
 from src.api.users import router as users_router
 from src.api.notifications import router as notifications_router
+from src.api.universities import router as universities_router
 
 app = FastAPI(
     title=settings.app_name,
@@ -31,6 +32,8 @@ app.add_middleware(
 
 # Wire the authentication endpoints
 app.include_router(auth_router, prefix="/api/v1")
+# Wire the universities endpoints
+app.include_router(universities_router, prefix="/api/v1")
 # Wire the communities endpoints
 app.include_router(communities_router, prefix="/api/v1")
 # Wire the posts endpoints

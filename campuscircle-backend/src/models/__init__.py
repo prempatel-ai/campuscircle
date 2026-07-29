@@ -14,6 +14,7 @@ from src.models.report import Report, AuditLog
 from src.models.refresh_token import RefreshToken
 from src.models.notification import Notification
 from src.models.bookmark import Bookmark
+from src.models.tag import Tag, post_tags
 
 __all__ = [
     "University",
@@ -27,4 +28,6 @@ __all__ = [
     "RefreshToken",
     "Notification",
     "Bookmark",
+    "Tag",
+    "post_tags",
 ]

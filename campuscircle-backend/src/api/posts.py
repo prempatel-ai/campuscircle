@@ -90,7 +90,8 @@ async def create_new_post(
         community_id=community_uuid,
         author_id=user_uuid,
         title=payload.title.strip(),
-        content=payload.content.strip()
+        content=payload.content.strip(),
+        university_id=uni_uuid
     )
 
     # 4. Fetch the enriched view using the ID we just received
@@ -177,7 +178,8 @@ async def create_new_thread(
             community_id=community_uuid,
             author_id=user_uuid,
             title=payload.title.strip(),
-            parts=payload.parts
+            parts=payload.parts,
+            university_id=uni_uuid
         )
     except ValueError as e:
         raise HTTPException(
@@ -220,6 +222,7 @@ async def create_new_thread(
 async def list_community_posts(
     community_id: str,
     sort: str = Query("new", enum=["new", "top", "hot"], description="Sorting algorithm"),
+    tag: str | None = Query(None, description="Filter posts by hashtag"),
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(20, ge=1, le=100, description="Page size"),
     current_user: dict = Depends(get_current_user),
@@ -250,7 +253,8 @@ async def list_community_posts(
         community_id=community_uuid,
         sort=sort,
         page=page,
-        size=size
+        size=size,
+        tag=tag
     )
 
     post_out_items = [
