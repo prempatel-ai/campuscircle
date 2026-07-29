@@ -40,23 +40,27 @@ def diagnose_email_sending(to_email: str) -> dict:
         msg.attach(MIMEText(text_content, "plain"))
         msg.attach(MIMEText(html_content, "html"))
 
+        # Render free tier blocks outbound port 587, so we try SSL port 465 first!
         try:
-            if settings.smtp_port == 465:
-                with smtplib.SMTP_SSL(settings.smtp_server, settings.smtp_port, timeout=10) as server:
-                    server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
-                    server.sendmail(sender, [to_email], msg.as_string())
-            else:
+            with smtplib.SMTP_SSL(settings.smtp_server, 465, timeout=10) as server:
+                server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
+                server.sendmail(sender, [to_email], msg.as_string())
+            results["status"] = "success"
+            results["details"] = f"Successfully delivered email to {to_email} via SMTP SSL (port 465)"
+            return results
+        except Exception as ssl_err:
+            logger.warning(f"SMTP SSL 465 failed, trying port {settings.smtp_port}: {ssl_err}")
+            try:
                 with smtplib.SMTP(settings.smtp_server, settings.smtp_port, timeout=10) as server:
                     server.starttls()
                     server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
                     server.sendmail(sender, [to_email], msg.as_string())
-
-            results["status"] = "success"
-            results["details"] = f"Successfully delivered email to {to_email} via SMTP ({settings.smtp_server})"
-            return results
-        except Exception as e:
-            results["smtp_error"] = str(e)
-            logger.error(f"SMTP diagnostic failed: {str(e)}", exc_info=True)
+                results["status"] = "success"
+                results["details"] = f"Successfully delivered email to {to_email} via SMTP STARTTLS (port {settings.smtp_port})"
+                return results
+            except Exception as e:
+                results["smtp_error"] = f"SSL 465 error: {str(ssl_err)} | STARTTLS {settings.smtp_port} error: {str(e)}"
+                logger.error(f"SMTP diagnostic failed: {results['smtp_error']}", exc_info=True)
 
     # 2. Try Resend API if configured
     if settings.resend_api_key and settings.resend_api_key.strip():
@@ -85,8 +89,7 @@ def diagnose_email_sending(to_email: str) -> dict:
     results["status"] = "stubbed"
     results["details"] = (
         "Neither SMTP nor Resend API credentials are valid/configured on Render. "
-        "The system logged the email to server logs instead of sending a physical email. "
-        "Please check your Render environment variables (SMTP_USERNAME, SMTP_PASSWORD)."
+        "The system logged the email to server logs instead of sending a physical email."
     )
     return results
 
@@ -104,18 +107,23 @@ def _send_via_smtp(to_email: str, subject: str, html_content: str, text_content:
     msg.attach(MIMEText(text_content, "plain"))
     msg.attach(MIMEText(html_content, "html"))
 
+    # Render free tier blocks outbound port 587, so we try SSL port 465 first
     try:
-        if settings.smtp_port == 465:
-            with smtplib.SMTP_SSL(settings.smtp_server, settings.smtp_port, timeout=10) as server:
-                server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
-                server.sendmail(sender, [to_email], msg.as_string())
-        else:
-            with smtplib.SMTP(settings.smtp_server, settings.smtp_port, timeout=10) as server:
-                server.starttls()
-                server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
-                server.sendmail(sender, [to_email], msg.as_string())
+        with smtplib.SMTP_SSL(settings.smtp_server, 465, timeout=10) as server:
+            server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
+            server.sendmail(sender, [to_email], msg.as_string())
+        logger.info(f"Email successfully sent to {to_email} via SMTP_SSL (port 465).")
+        return True
+    except Exception as ssl_err:
+        logger.warning(f"SMTP SSL 465 failed, trying STARTTLS port {settings.smtp_port}: {ssl_err}")
 
-        logger.info(f"Email successfully sent to {to_email} via SMTP ({settings.smtp_server}).")
+    # Fallback to STARTTLS port 587
+    try:
+        with smtplib.SMTP(settings.smtp_server, settings.smtp_port, timeout=10) as server:
+            server.starttls()
+            server.login(settings.smtp_username.strip(), settings.smtp_password.strip())
+            server.sendmail(sender, [to_email], msg.as_string())
+        logger.info(f"Email successfully sent to {to_email} via STARTTLS (port {settings.smtp_port}).")
         return True
     except Exception as e:
         logger.error(f"Failed to send email to {to_email} via SMTP: {str(e)}", exc_info=True)
