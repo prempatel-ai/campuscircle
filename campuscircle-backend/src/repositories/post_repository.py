@@ -527,3 +527,150 @@ async def get_saved_posts(
     ]
 
     return enriched, total_count
+
+
+async def get_for_you_feed(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    university_id: uuid.UUID,
+    page: int = 1,
+    size: int = 20
+) -> Tuple[List[EnrichedPost], int]:
+    """
+    Personalized "For You" feed for a specific user:
+    - Calculates user's own activity (votes, comments, posts) in the last 30 days.
+    - Identifies top communities the user interacted with.
+    - Ranks posts in the caller's university matching these preferred communities higher.
+    - Recency-sorted within affinity levels.
+    - Fallback: If zero engagement history, returns recency-sorted posts across user's university.
+    - CONSTRAINED: Never factors in OTHER users' global scores or popularity.
+    """
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import or_, case
+    from src.models.community import Community
+    from src.models.vote import Vote
+    from src.models.tag import Tag, post_tags
+
+    if page < 1:
+        page = 1
+    if size < 1:
+        size = 20
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+    # 1. Compute user's community interactions in last 30 days
+    # A. Votes by user
+    vote_stmt = (
+        select(Post.community_id, func.count(Vote.id))
+        .join(Post, Vote.post_id == Post.id)
+        .where(Vote.user_id == user_id, Vote.created_at >= cutoff)
+        .group_by(Post.community_id)
+    )
+    vote_res = await db.execute(vote_stmt)
+    vote_counts = {row[0]: row[1] for row in vote_res.all()}
+
+    # B. Comments by user
+    comment_stmt = (
+        select(Post.community_id, func.count(Comment.id))
+        .join(Post, Comment.post_id == Post.id)
+        .where(Comment.author_id == user_id, Comment.created_at >= cutoff)
+        .group_by(Post.community_id)
+    )
+    comment_res = await db.execute(comment_stmt)
+    comment_counts = {row[0]: row[1] for row in comment_res.all()}
+
+    # C. Posts created by user
+    post_stmt = (
+        select(Post.community_id, func.count(Post.id))
+        .where(Post.author_id == user_id, Post.created_at >= cutoff)
+        .group_by(Post.community_id)
+    )
+    post_res = await db.execute(post_stmt)
+    post_counts = {row[0]: row[1] for row in post_res.all()}
+
+    # Combine community scores (Votes: 1x, Comments: 2x, Posts: 3x)
+    all_community_ids = set(vote_counts.keys()) | set(comment_counts.keys()) | set(post_counts.keys())
+    community_scores = {}
+    for cid in all_community_ids:
+        score = (vote_counts.get(cid, 0) * 1) + (comment_counts.get(cid, 0) * 2) + (post_counts.get(cid, 0) * 3)
+        if score > 0:
+            community_scores[cid] = score
+
+    # Base query for all active posts in caller's university
+    comment_count_col = _comment_count_subquery(Post.id)
+    thread_total_col = _thread_total_parts_subquery(Post.thread_id)
+
+    base_query = (
+        select(
+            Post,
+            User.username.label("author_username"),
+            comment_count_col.label("comment_count"),
+            func.coalesce(thread_total_col, 1).label("thread_total_parts")
+        )
+        .join(User, User.id == Post.author_id)
+        .join(Community, Community.id == Post.community_id)
+        .where(
+            Community.university_id == university_id,
+            Post.is_deleted == False,
+            or_(Post.thread_position == 1, Post.thread_position.is_(None))
+        )
+    )
+
+    count_stmt = (
+        select(func.count(Post.id))
+        .join(Community, Community.id == Post.community_id)
+        .where(
+            Community.university_id == university_id,
+            Post.is_deleted == False,
+            or_(Post.thread_position == 1, Post.thread_position.is_(None))
+        )
+    )
+
+    count_res = await db.execute(count_stmt)
+    total_count = count_res.scalar_one() or 0
+
+    # If user has NO engagement history at all, fallback to pure recency feed
+    if not community_scores:
+        query = base_query.order_by(Post.created_at.desc()).offset((page - 1) * size).limit(size)
+        res = await db.execute(query)
+        rows = res.all()
+        enriched = [
+            EnrichedPost(
+                post=row[0],
+                author_username=row[1],
+                comment_count=row[2],
+                thread_total_parts=row[3] or 1
+            )
+            for row in rows
+        ]
+        return enriched, total_count
+
+    # Build CASE expression for community affinity score
+    community_case_w = []
+    for cid, weight in community_scores.items():
+        community_case_w.append((Post.community_id == cid, weight))
+
+    community_affinity = case(*community_case_w, else_=0)
+
+    # Order by user's personal community affinity DESC, then recency DESC
+    query = (
+        base_query
+        .order_by(community_affinity.desc(), Post.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    enriched = [
+        EnrichedPost(
+            post=row[0],
+            author_username=row[1],
+            comment_count=row[2],
+            thread_total_parts=row[3] or 1
+        )
+        for row in rows
+    ]
+
+    return enriched, total_count
