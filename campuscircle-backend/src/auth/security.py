@@ -134,3 +134,47 @@ def verify_verification_token(token: str) -> str:
         raise TokenExpiredError("Verification token has expired.") from e
     except JWTError as e:
         raise TokenInvalidError("Invalid verification token.") from e
+
+
+def generate_password_reset_token(user_id: Any) -> str:
+    """
+    Generate a 1-hour signed token for password reset.
+    """
+    expire = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    to_encode = {
+        "sub": str(user_id),
+        "type": "password_reset",
+        "exp": expire,
+    }
+    
+    return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def verify_password_reset_token(token: str) -> str:
+    """
+    Verify the password reset token and return the extracted user ID.
+    
+    Raises TokenExpiredError if the token has expired.
+    Raises TokenInvalidError if the token is invalid or does not have password_reset type.
+    """
+    try:
+        payload = jwt.decode(
+            token, 
+            settings.jwt_secret, 
+            algorithms=[settings.jwt_algorithm]
+        )
+        
+        if payload.get("type") != "password_reset":
+            raise TokenInvalidError("Invalid token type. Expected password reset token.")
+            
+        user_id = payload.get("sub")
+        if not user_id:
+            raise TokenInvalidError("Malformed token payload. Missing subject.")
+            
+        return user_id
+        
+    except ExpiredSignatureError as e:
+        raise TokenExpiredError("Password reset token has expired.") from e
+    except JWTError as e:
+        raise TokenInvalidError("Invalid password reset token.") from e

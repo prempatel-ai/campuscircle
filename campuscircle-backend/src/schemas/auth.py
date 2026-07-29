@@ -87,3 +87,40 @@ class LogoutResponse(BaseModel):
     Pydantic schema for logout response.
     """
     message: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    """
+    Pydantic schema for requesting a password reset link.
+    """
+    email: str = Field(..., description="User's academic email address")
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        v = v.strip().lower()
+        if "@" not in v:
+            raise ValueError("Invalid email address format.")
+        return v
+
+
+class ForgotPasswordResponse(BaseModel):
+    """
+    Pydantic schema for forgot password generic response.
+    """
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    """
+    Pydantic schema for resetting password with token.
+    """
+    token: str = Field(..., description="The password reset token.")
+    new_password: str = Field(..., min_length=8, description="The new password.")
+
+
+class ResetPasswordResponse(BaseModel):
+    """
+    Pydantic schema for reset password response.
+    """
+    message: str

@@ -18,12 +18,18 @@ from src.schemas.auth import (
     TokenRefreshRequest,
     TokenRefreshResponse,
     LogoutRequest,
-    LogoutResponse
+    LogoutResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse
 )
 from src.auth.security import (
     hash_password, 
     generate_verification_token, 
     verify_verification_token,
+    generate_password_reset_token,
+    verify_password_reset_token,
     verify_password,
     create_access_token,
     AuthError
@@ -31,8 +37,10 @@ from src.auth.security import (
 from src.repositories.auth_repository import (
     create_refresh_token,
     validate_refresh_token,
-    revoke_refresh_token
+    revoke_refresh_token,
+    revoke_all_for_user
 )
+from src.workers.email import send_verification_email, send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -75,12 +83,7 @@ login_ip_limiter = InMemoryRateLimiter(limit=20, window_seconds=3600)
 login_email_limiter = InMemoryRateLimiter(limit=10, window_seconds=3600)
 
 
-def stub_send_verification_email(email: str, token: str):
-    """
-    Stub for sending verification email. 
-    In future phases, this will use a real email service provider.
-    """
-    print(f"[STUB] Sending email verification to {email} with token: {token}")
+from src.workers.email import send_verification_email
 
 
 @router.post(
@@ -163,8 +166,8 @@ async def signup(
     # 5. Generate email verification token
     verification_token = generate_verification_token(new_user.id)
     
-    # 6. Add email sending to background tasks
-    background_tasks.add_task(stub_send_verification_email, new_user.email, verification_token)
+    # 6. Add email sending to background tasks (Resend API or local dev stub)
+    background_tasks.add_task(send_verification_email, new_user.email, verification_token)
     
     # Commit transaction to DB
     await db.commit()
@@ -346,3 +349,78 @@ async def logout(
 ):
     await revoke_refresh_token(db, payload.refresh_token)
     return LogoutResponse(message="Successfully logged out.")
+
+
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Request a password reset link"
+)
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
+    email = payload.email.strip().lower()
+    stmt = select(User).where(User.email == email)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user:
+        reset_token = generate_password_reset_token(user.id)
+        background_tasks.add_task(send_password_reset_email, user.email, reset_token)
+
+    # ALWAYS return the exact same generic message regardless of email existence (prevents account enumeration)
+    return ForgotPasswordResponse(
+        message="If an account with that email exists, password reset instructions have been sent."
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=ResetPasswordResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Reset password using reset token"
+)
+async def reset_password(
+    payload: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        user_id_str = verify_password_reset_token(payload.token)
+    except AuthError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+    try:
+        user_uuid = uuid.UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user ID in reset token."
+        )
+
+    stmt = select(User).where(User.id == user_uuid)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+
+    # Update password hash
+    user.password_hash = hash_password(payload.new_password)
+
+    # Revoke ALL active refresh tokens for this user (force re-login everywhere for security)
+    await revoke_all_for_user(db, user.id)
+
+    await db.commit()
+
+    return ResetPasswordResponse(
+        message="Password reset successfully. Please log in with your new password."
+    )

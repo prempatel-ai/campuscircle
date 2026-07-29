@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
 
+    # Resend Email Configuration
+    resend_api_key: str = ""
+    from_email_address: str = "onboarding@resend.dev"
+    frontend_url: str = "https://campuscircle-pdqa.vercel.app"
+
     # CORS configuration
     cors_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 

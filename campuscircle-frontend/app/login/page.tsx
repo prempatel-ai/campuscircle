@@ -105,6 +105,9 @@ export default function LoginPage() {
               <label htmlFor="password" className="block text-xs font-mono text-accent font-bold uppercase tracking-wider">
                 Password
               </label>
+              <Link href="/forgot-password" className="text-xs font-sans text-primary hover:underline font-medium">
+                Forgot password?
+              </Link>
             </div>
             <input
               id="password"
