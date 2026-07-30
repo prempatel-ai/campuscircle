@@ -66,11 +66,80 @@ async def fetch_video_title(video_id: str) -> str | None:
     return None
 
 
+async def fetch_transcript_innertube(video_id: str) -> List[dict]:
+    """
+    Fetch transcript using YouTube Android InnerTube API.
+    Bypasses web scraping and bot protection because it uses native mobile API formats.
+    """
+    url = "https://www.youtube.com/youtubei/v1/player"
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "com.google.android.youtube/19.05.36 (Linux; U; Android 11; US)",
+    }
+    payload = {
+        "videoId": video_id,
+        "context": {
+            "client": {
+                "clientName": "ANDROID",
+                "clientVersion": "19.05.36",
+                "hl": "en",
+                "gl": "US"
+            }
+        }
+    }
+
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        res = await client.post(url, headers=headers, json=payload)
+        if res.status_code != 200:
+            raise Exception(f"InnerTube API returned {res.status_code}")
+
+        data = res.json()
+        captions = data.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
+        if not captions:
+            raise Exception("No captions available for this video")
+
+        en_track = next((c for c in captions if "en" in c.get("languageCode", "")), captions[0])
+        caption_url = en_track.get("baseUrl")
+        if not caption_url:
+            raise Exception("No caption URL found")
+
+        sub_res = await client.get(caption_url, headers=headers)
+        if sub_res.status_code != 200:
+            raise Exception("Failed to download caption track")
+
+        content = sub_res.text
+        segments = []
+
+        if content.strip().startswith("{"):
+            sub_json = json.loads(content)
+            events = sub_json.get("events", [])
+            for ev in events:
+                segs = ev.get("segs", [])
+                text_part = "".join([s.get("utf8", "") for s in segs]).replace("\n", " ").strip()
+                if text_part:
+                    segments.append({
+                        "text": text_part,
+                        "start": float(ev.get("tStartMs", 0)) / 1000.0,
+                        "duration": float(ev.get("dDurationMs", 0)) / 1000.0
+                    })
+        else:
+            root = ET.fromstring(content)
+            for elem in root.findall("text"):
+                text_val = html.unescape(elem.text or "").replace("\n", " ").strip()
+                if text_val:
+                    segments.append({
+                        "text": text_val,
+                        "start": float(elem.attrib.get("start", 0)),
+                        "duration": float(elem.attrib.get("dur", 0))
+                    })
+
+        if not segments:
+            raise Exception("Empty transcript payload")
+
+        return segments
+
+
 async def fetch_transcript_fallback(video_id: str) -> List[dict]:
-    """
-    Direct fallback transcript extractor using custom User-Agent and YouTube timedtext API.
-    Bypasses cloud IP bot detection flags by parsing player response captionTracks directly.
-    """
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9"
@@ -124,25 +193,94 @@ async def fetch_transcript_fallback(video_id: str) -> List[dict]:
         return segments
 
 
+async def fetch_transcript_timedtext(video_id: str) -> List[dict]:
+    """
+    Direct official YouTube timedtext API fetcher.
+    Works for any video with captions (manual CC or auto-generated ASR).
+    Requires zero web scraping or page HTML parsing.
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+    }
+
+    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        list_url = f"https://www.youtube.com/api/timedtext?v={video_id}&type=list"
+        list_res = await client.get(list_url, headers=headers)
+
+        lang_code = "en"
+        kind = None
+
+        if list_res.status_code == 200 and "<track" in list_res.text:
+            try:
+                root = ET.fromstring(list_res.text)
+                tracks = root.findall("track")
+                if tracks:
+                    en_t = next((t for t in tracks if "en" in t.attrib.get("lang_code", "")), tracks[0])
+                    lang_code = en_t.attrib.get("lang_code", "en")
+                    kind = en_t.attrib.get("kind")
+            except Exception:
+                pass
+
+        caption_url = f"https://www.youtube.com/api/timedtext?v={video_id}&lang={lang_code}"
+        if kind:
+            caption_url += f"&kind={kind}"
+
+        sub_res = await client.get(caption_url, headers=headers)
+
+        if (sub_res.status_code != 200 or not sub_res.text.strip()) and lang_code == "en":
+            asr_url = f"https://www.youtube.com/api/timedtext?v={video_id}&lang=en&kind=asr"
+            sub_res = await client.get(asr_url, headers=headers)
+
+        if sub_res.status_code != 200 or not sub_res.text.strip():
+            raise Exception("Timedtext API returned empty captions")
+
+        root = ET.fromstring(sub_res.text)
+        segments = []
+        for elem in root.findall("text"):
+            text_val = html.unescape(elem.text or "").replace("\n", " ").strip()
+            if text_val:
+                segments.append({
+                    "text": text_val,
+                    "start": float(elem.attrib.get("start", 0)),
+                    "duration": float(elem.attrib.get("dur", 0))
+                })
+
+        if not segments:
+            raise Exception("No transcript text items in XML")
+
+        return segments
+
+
 async def get_transcript_with_fallback(video_id: str) -> List[dict]:
-    # 1. Try youtube-transcript-api first
+    # 1. Try direct official YouTube timedtext API (Lightweight, 0 scraping, no CAPTCHA)
+    try:
+        return await fetch_transcript_timedtext(video_id)
+    except Exception:
+        pass
+
+    # 2. Try Android InnerTube API (most reliable mobile format on cloud IPs)
+    try:
+        return await fetch_transcript_innertube(video_id)
+    except Exception:
+        pass
+
+    # 3. Try youtube-transcript-api
     try:
         try:
             return YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'en-GB'])
         except Exception:
             return YouTubeTranscriptApi.get_transcript(video_id)
-    except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable) as e:
-        raise e
     except Exception:
         pass
 
-    # 2. Try direct timedtext fallback
+    # 4. Try direct web page scraper
     try:
         return await fetch_transcript_fallback(video_id)
     except Exception as fallback_err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not retrieve transcript: {str(fallback_err)}. Ensure closed captions (CC) are enabled for this video."
+            detail=f"Could not retrieve transcript automatically ({str(fallback_err)}). Please paste the transcript text directly in the 'Paste Notes / Text' tab."
         )
 
 
@@ -541,20 +679,40 @@ async def explain_youtube_transcript(
 ):
     user_uuid = uuid.UUID(current_user["user_id"])
 
-    video_id = extract_video_id(payload.youtube_url)
+    # If user provided a direct video URL, extract video_id
+    video_id = extract_video_id(payload.youtube_url) if payload.youtube_url else None
     if not video_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid YouTube URL. Please provide a valid YouTube watch link or Short URL."
-        )
+        video_id = f"custom_{uuid.uuid4().hex[:10]}"
 
-    cache_stmt = (
-        select(LearningSession)
-        .where(LearningSession.video_id == video_id)
-        .order_by(LearningSession.created_at.desc())
-    )
-    cache_res = await db.execute(cache_stmt)
-    cached_session = cache_res.scalars().first()
+    # Check cache if it's a real YouTube video_id
+    if not video_id.startswith("custom_"):
+        cache_stmt = (
+            select(LearningSession)
+            .where(LearningSession.video_id == video_id)
+            .order_by(LearningSession.created_at.desc())
+        )
+        cache_res = await db.execute(cache_stmt)
+        cached_session = cache_res.scalars().first()
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+        user_count_stmt = select(func.count(LearningSession.id)).where(
+            LearningSession.user_id == user_uuid,
+            LearningSession.created_at >= cutoff
+        )
+        user_count_res = await db.execute(user_count_stmt)
+        user_daily_explanations = user_count_res.scalar_one() or 0
+
+        if cached_session:
+            raw_chunks = cached_session.explanation_chunks.get("chunks", [])
+            chunk_models = [ExplanationChunk(title=c["title"], explanation=c["explanation"]) for c in raw_chunks]
+            return ExplainResponse(
+                session_id=str(cached_session.id),
+                video_id=video_id,
+                video_title=cached_session.video_title,
+                chunks=chunk_models,
+                is_cached=True,
+                daily_explanations_remaining=max(0, EXPLAIN_DAILY_LIMIT - user_daily_explanations)
+            )
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
     user_count_stmt = select(func.count(LearningSession.id)).where(
@@ -564,18 +722,6 @@ async def explain_youtube_transcript(
     user_count_res = await db.execute(user_count_stmt)
     user_daily_explanations = user_count_res.scalar_one() or 0
 
-    if cached_session:
-        raw_chunks = cached_session.explanation_chunks.get("chunks", [])
-        chunk_models = [ExplanationChunk(title=c["title"], explanation=c["explanation"]) for c in raw_chunks]
-        return ExplainResponse(
-            session_id=str(cached_session.id),
-            video_id=video_id,
-            video_title=cached_session.video_title,
-            chunks=chunk_models,
-            is_cached=True,
-            daily_explanations_remaining=max(0, EXPLAIN_DAILY_LIMIT - user_daily_explanations)
-        )
-
     if user_daily_explanations >= EXPLAIN_DAILY_LIMIT:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -583,7 +729,7 @@ async def explain_youtube_transcript(
         )
 
     transcript_text = payload.transcript.strip() if payload.transcript else None
-    video_title = await fetch_video_title(video_id) or f"YouTube Video ({video_id})"
+    video_title = (await fetch_video_title(video_id) if not video_id.startswith("custom_") else "Custom Learning Topic") or f"Learning Topic ({video_id})"
 
     if not transcript_text:
         try:
@@ -601,7 +747,7 @@ async def explain_youtube_transcript(
     new_session = LearningSession(
         user_id=user_uuid,
         video_id=video_id,
-        youtube_url=f"https://www.youtube.com/watch?v={video_id}",
+        youtube_url=payload.youtube_url or f"https://www.youtube.com/watch?v={video_id}",
         video_title=video_title,
         transcript=transcript_text,
         explanation_chunks={"chunks": chunks_data}
