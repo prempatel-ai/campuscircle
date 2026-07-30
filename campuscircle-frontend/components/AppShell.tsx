@@ -15,6 +15,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
 
   // 1. Enforce authentication check
@@ -44,8 +45,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   }
 
   const avatarSeed = user?.username || "anonymous";
-
-  const [searchQuery, setSearchQuery] = useState("");
 
   const handleLogout = async () => {
     setIsMenuOpen(false);
