@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     from_email_address: str = ""
     frontend_url: str = "https://campuscircle-pdqa.vercel.app"
 
+    # AI / Groq Learning API Configuration
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+
     # CORS configuration
     cors_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 

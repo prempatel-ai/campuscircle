@@ -21,3 +21,22 @@ class ExtractResponse(BaseModel):
     segments_count: int
     segments: Optional[List[TranscriptSegment]] = None
     daily_extractions_remaining: int
+
+
+class ExplanationChunk(BaseModel):
+    title: str
+    explanation: str
+
+
+class ExplainRequest(BaseModel):
+    youtube_url: str = Field(..., description="YouTube video URL")
+    transcript: Optional[str] = Field(None, description="Optional pre-extracted transcript text")
+
+
+class ExplainResponse(BaseModel):
+    session_id: str
+    video_id: str
+    video_title: str
+    chunks: List[ExplanationChunk]
+    is_cached: bool
+    daily_explanations_remaining: int
