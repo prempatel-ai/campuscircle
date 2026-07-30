@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
-import { CreateCommunityDialog } from "./CreateCommunityDialog";
+import React from "react";
 
 interface Community {
   id: string;
@@ -15,6 +14,7 @@ interface CommunityTabsProps {
   onSelect: (id: string) => void;
   onCommunityCreated: (community: Community) => void;
   onComposePost?: () => void;
+  onRequestCreate?: () => void;
 }
 
 export const CommunityTabs: React.FC<CommunityTabsProps> = ({
@@ -23,13 +23,8 @@ export const CommunityTabs: React.FC<CommunityTabsProps> = ({
   onSelect,
   onCommunityCreated,
   onComposePost,
+  onRequestCreate,
 }) => {
-  const [isCreating, setIsCreating] = useState(false);
-
-  const handleCreated = (community: Community) => {
-    onCommunityCreated(community);
-    setIsCreating(false);
-  };
 
   return (
     <>
@@ -57,7 +52,7 @@ export const CommunityTabs: React.FC<CommunityTabsProps> = ({
           {/* New community pill — mobile */}
           <button
             id="new-community-btn"
-            onClick={() => setIsCreating(true)}
+            onClick={() => onRequestCreate?.()}
             aria-label="Create new community"
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-sans font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer border border-dashed border-border-muted text-ink/50 hover:border-primary/50 hover:text-primary hover:bg-primary/5 shrink-0"
           >
@@ -116,7 +111,7 @@ export const CommunityTabs: React.FC<CommunityTabsProps> = ({
 
             {/* Desktop New Community button */}
             <button
-              onClick={() => setIsCreating(true)}
+              onClick={() => onRequestCreate?.()}
               className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-sans font-semibold text-ink/50 hover:bg-surface hover:text-primary transition-all flex items-center gap-2 border border-dashed border-border-muted/80 mt-1 cursor-pointer"
             >
               <svg className="w-4 h-4 text-ink/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,14 +122,6 @@ export const CommunityTabs: React.FC<CommunityTabsProps> = ({
           </div>
         </div>
       </aside>
-
-      {/* Create community dialog */}
-      {isCreating && (
-        <CreateCommunityDialog
-          onSuccess={handleCreated}
-          onClose={() => setIsCreating(false)}
-        />
-      )}
     </>
   );
 };

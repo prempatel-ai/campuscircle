@@ -221,6 +221,7 @@ function FeedContent() {
             onSelect={handleSelectCommunity}
             onCommunityCreated={handleCommunityCreated}
             onComposePost={selectedCommunityId ? () => setIsComposing(true) : undefined}
+            onRequestCreate={() => setIsCreatingCommunity(true)}
           />
         )}
       </div>
