@@ -241,6 +241,20 @@ async def create_new_thread(
             detail=str(e)
         )
 
+    # Reva AI Auto-Reply if @reva is tagged in post title or content
+    full_post_text = f"{payload.title} {' '.join(payload.parts)}"
+    if "reva" in full_post_text.lower() and created_ids:
+        from src.services.reva_service import handle_reva_auto_reply_if_tagged
+        try:
+            await handle_reva_auto_reply_if_tagged(
+                db=db,
+                post_id=created_ids[0],
+                comment_content=full_post_text,
+                user_id=user_uuid
+            )
+        except Exception as e:
+            print(f"[Reva Post Auto-Reply Error]: {e}")
+
     # 4. Fetch enriched versions in order
     result_posts = []
     for pid in created_ids:

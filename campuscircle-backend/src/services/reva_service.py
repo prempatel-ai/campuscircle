@@ -33,7 +33,6 @@ async def get_or_create_reva_user(db: AsyncSession) -> User:
         uni_id = uuid.uuid4()
 
     bot = User(
-        id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
         university_id=uni_id,
         email="reva@campuscircle.ai",
         username="reva",
@@ -47,8 +46,8 @@ async def get_or_create_reva_user(db: AsyncSession) -> User:
         await db.refresh(bot)
     except Exception:
         await db.rollback()
-        # Fallback query if concurrent creation occurred
-        bot = (await db.execute(select(User).where(User.username == "reva"))).scalar_one()
+        bot_res = await db.execute(select(User).where(User.username == "reva"))
+        bot = bot_res.scalar_one_or_none()
 
     return bot
 
@@ -119,7 +118,7 @@ async def handle_reva_auto_reply_if_tagged(
     Checks if @reva is tagged in the comment. If yes, generates a Grok-style reply
     and saves it as a new comment from Reva AI.
     """
-    if "@reva" not in comment_content.lower():
+    if "reva" not in comment_content.lower():
         return None
 
     # Fetch post context
