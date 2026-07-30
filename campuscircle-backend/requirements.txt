@@ -26,3 +26,4 @@ httpx==0.28.1
 
 # YouTube Transcript Extraction
 youtube-transcript-api==0.6.3
+yt-dlp>=2024.1.1
