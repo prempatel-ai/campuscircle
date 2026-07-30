@@ -19,6 +19,7 @@ class LearningSession(Base):
     youtube_url: Mapped[str] = mapped_column(String(512), nullable=False)
     video_title: Mapped[str] = mapped_column(String(255), nullable=False)
     transcript: Mapped[str] = mapped_column(Text, nullable=False)
+    language: Mapped[str] = mapped_column(String(10), default="en", server_default="en", nullable=False, index=True)
     
     # Store structured storytelling explanation chunks
     explanation_chunks: Mapped[dict] = mapped_column(

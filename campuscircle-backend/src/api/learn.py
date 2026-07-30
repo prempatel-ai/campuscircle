@@ -55,6 +55,14 @@ YOUTUBE_REGEX = re.compile(
 EXTRACTION_DAILY_LIMIT = 10
 EXPLAIN_DAILY_LIMIT = 5
 
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "hi": "Hindi (हिंदी)",
+    "es": "Spanish (Español)",
+    "fr": "French (Français)",
+    "gu": "Gujarati (ગુજરાતી)"
+}
+
 
 def extract_video_id(url: str) -> str | None:
     match = YOUTUBE_REGEX.search(url.strip())
@@ -214,7 +222,7 @@ async def fetch_transcript_ytdlp(video_id: str) -> List[dict]:
                     segments.append({
                         "text": text_val,
                         "start": float(elem.attrib.get("start", 0)),
-                        "duration": float(elem.attrib.get("dur", 0)),
+                        "duration": float(elem.attrib.get("duration", 0)),
                     })
 
         if not segments:
@@ -253,7 +261,7 @@ async def get_transcript_with_fallback(video_id: str) -> List[dict]:
     )
 
 
-# ─── Groq & Remediation Helpers ─────────────────────────────────────────────
+# ─── Groq & Multilingual Helpers ───────────────────────────────────────────
 
 def parse_and_validate_chunks(content_str: str) -> List[dict] | None:
     try:
@@ -307,13 +315,14 @@ _MOCK_CHUNKS = [
 ]
 
 
-async def call_groq_api_for_explanation(transcript_text: str) -> List[dict]:
+async def call_groq_api_for_explanation(transcript_text: str, language_name: str = "English") -> List[dict]:
     if not settings.groq_api_key:
         return _MOCK_CHUNKS
 
     system_prompt = (
         "You are an expert AI educator. Break down the provided video transcript into "
         "digestible, storytelling-style explanation chunks for a first-time learner. "
+        f"You MUST write all titles and explanations directly in {language_name}. "
         "Return a JSON object with a single top-level key 'chunks' — a list where each item "
         "has exactly two string keys: 'title' and 'explanation'."
     )
@@ -323,7 +332,7 @@ async def call_groq_api_for_explanation(transcript_text: str) -> List[dict]:
         "model": settings.groq_model,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Explain the following transcript in storytelling chunks:\n\n{transcript_text[:12000]}"},
+            {"role": "user", "content": f"Explain the following transcript in storytelling chunks in {language_name}:\n\n{transcript_text[:12000]}"},
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.5,
@@ -391,12 +400,13 @@ _MOCK_QUIZ = {
 }
 
 
-async def call_groq_api_for_quiz(video_title: str, explanation_text: str) -> dict:
+async def call_groq_api_for_quiz(video_title: str, explanation_text: str, language_name: str = "English") -> dict:
     if not settings.groq_api_key:
         return _MOCK_QUIZ
 
     system_prompt = (
         "You are an expert AI assessment designer. Create a 3-phase multiple-choice quiz. "
+        f"You MUST write all questions, options, and explanations directly in {language_name}. "
         "Return JSON with top-level key 'phases' containing 'phase1', 'phase2', 'phase3'. "
         "Each phase has 'name', 'description', and 'questions' (list of exactly 10 questions). "
         "Each question MUST contain:\n"
@@ -405,7 +415,7 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str) -> dic
         "- 'options': list of 4 strings\n"
         "- 'correct_index': integer (0-3)\n"
         "- 'explanation': string explanation\n"
-        "- 'chunk_id': string (e.g. 'chunk_0', 'chunk_1', 'chunk_2' referencing explanation sections)\n"
+        "- 'chunk_id': string (e.g. 'chunk_0', 'chunk_1', 'chunk_2')\n"
         "- 'concept_category': string (a broad tag like 'System Design', 'Recursion', 'Fundamentals', 'Algorithms')."
     )
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -414,7 +424,7 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str) -> dic
         "model": settings.groq_model,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Quiz for '{video_title}':\n\n{explanation_text[:12000]}"},
+            {"role": "user", "content": f"Quiz in {language_name} for '{video_title}':\n\n{explanation_text[:12000]}"},
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.3,
@@ -433,22 +443,21 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str) -> dic
     raise HTTPException(status_code=422, detail="Failed to generate a valid quiz. Please try again.")
 
 
-async def call_groq_api_for_remediation(video_title: str, concept_title: str, original_explanation: str) -> dict:
+async def call_groq_api_for_remediation(video_title: str, concept_title: str, original_explanation: str, language_name: str = "English") -> dict:
     if not settings.groq_api_key:
         return {
             "re_explanation": (
                 f"Let me explain '{concept_title}' with a fresh perspective! "
                 "Think of it like building a bridge: instead of looking at the whole structure at once, "
-                "you focus on reinforcing one key support pillar. By isolating this core rule, everything else clicks into place."
+                "you focus on reinforcing one key support pillar."
             ),
             "analogy": "Bridge support pillar analogy"
         }
 
     system_prompt = (
         "You are an empathetic AI tutor providing targeted remediation for a student who missed a quiz question. "
-        "Provide a SHORT, focused re-explanation of JUST this ONE concept. Use a DIFFERENT phrasing or fresh analogy "
-        "than the original. Return JSON with two string keys: 're_explanation' (2-3 encouraging sentences) and "
-        "'analogy' (short title of the analogy used)."
+        f"Provide a SHORT, focused re-explanation of JUST this ONE concept directly in {language_name}. Use a DIFFERENT phrasing or fresh analogy. "
+        "Return JSON with two string keys: 're_explanation' (2-3 encouraging sentences) and 'analogy' (short title of the analogy used)."
     )
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -463,7 +472,7 @@ async def call_groq_api_for_remediation(video_title: str, concept_title: str, or
                     f"Video Topic: '{video_title}'\n"
                     f"Concept to Remediate: '{concept_title}'\n"
                     f"Original Explanation: {original_explanation[:2000]}\n\n"
-                    "Provide a targeted, fresh micro-explanation and analogy."
+                    f"Provide a targeted, fresh micro-explanation and analogy in {language_name}."
                 )
             },
         ],
@@ -488,7 +497,7 @@ async def call_groq_api_for_remediation(video_title: str, concept_title: str, or
     return {
         "re_explanation": (
             f"Let's break down '{concept_title}' again! "
-            "Focus on the underlying core rule: each component has a specific job, and understanding how input transforms into output removes the confusion."
+            "Focus on the underlying core rule: each component has a specific job."
         ),
         "analogy": "Input-output transformation model"
     }
@@ -553,7 +562,7 @@ async def extract_youtube_transcript(
     )
 
 
-@router.post("/explain", response_model=ExplainResponse, status_code=200, summary="Generate AI explanation chunks")
+@router.post("/explain", response_model=ExplainResponse, status_code=200, summary="Generate AI explanation chunks in target language")
 async def explain_youtube_transcript(
     payload: ExplainRequest,
     current_user: dict = Depends(get_current_user),
@@ -561,15 +570,24 @@ async def explain_youtube_transcript(
 ):
     user_uuid = uuid.UUID(current_user["user_id"])
 
+    target_lang = payload.language.strip().lower() if payload.language else "en"
+    if target_lang not in SUPPORTED_LANGUAGES:
+        target_lang = "en"
+    lang_name = SUPPORTED_LANGUAGES.get(target_lang, "English")
+
     video_id = extract_video_id(payload.youtube_url) if payload.youtube_url else None
     if not video_id:
         video_id = f"custom_{uuid.uuid4().hex[:10]}"
 
+    # Cache lookup MUST check (video_id, language) pair!
     cached_session = None
     if not video_id.startswith("custom_"):
         res = await db.execute(
             select(LearningSession)
-            .where(LearningSession.video_id == video_id)
+            .where(
+                LearningSession.video_id == video_id,
+                LearningSession.language == target_lang
+            )
             .order_by(LearningSession.created_at.desc())
         )
         cached_session = res.scalars().first()
@@ -586,6 +604,7 @@ async def explain_youtube_transcript(
             session_id=str(cached_session.id),
             video_id=video_id,
             video_title=cached_session.video_title,
+            language=cached_session.language,
             chunks=[ExplanationChunk(title=c["title"], explanation=c["explanation"]) for c in raw_chunks],
             is_cached=True,
             daily_explanations_remaining=max(0, EXPLAIN_DAILY_LIMIT - daily_count),
@@ -611,7 +630,7 @@ async def explain_youtube_transcript(
         except VideoUnavailable:
             raise HTTPException(404, "This video is unavailable.")
 
-    chunks_data = await call_groq_api_for_explanation(transcript_text)
+    chunks_data = await call_groq_api_for_explanation(transcript_text, language_name=lang_name)
 
     session = LearningSession(
         user_id=user_uuid,
@@ -619,6 +638,7 @@ async def explain_youtube_transcript(
         youtube_url=payload.youtube_url or f"https://www.youtube.com/watch?v={video_id}",
         video_title=video_title,
         transcript=transcript_text,
+        language=target_lang,
         explanation_chunks={"chunks": chunks_data},
     )
     db.add(session)
@@ -629,6 +649,7 @@ async def explain_youtube_transcript(
         session_id=str(session.id),
         video_id=video_id,
         video_title=video_title,
+        language=session.language,
         chunks=[ExplanationChunk(title=c["title"], explanation=c["explanation"]) for c in chunks_data],
         is_cached=False,
         daily_explanations_remaining=max(0, EXPLAIN_DAILY_LIMIT - daily_count - 1),
@@ -648,7 +669,7 @@ def sanitize_phase_questions(phase_dict: dict) -> List[QuizQuestionOut]:
     ]
 
 
-@router.post("/{session_id}/quiz", response_model=QuizSessionOut, status_code=200, summary="Get/generate 3-phase quiz")
+@router.post("/{session_id}/quiz", response_model=QuizSessionOut, status_code=200, summary="Get/generate 3-phase quiz in session language")
 async def get_or_create_quiz(
     session_id: str,
     current_user: dict = Depends(get_current_user),
@@ -664,9 +685,11 @@ async def get_or_create_quiz(
     if not session:
         raise HTTPException(404, "Learning session not found.")
 
+    lang_name = SUPPORTED_LANGUAGES.get(session.language, "English")
+
     if not session.quiz_data:
         explanation_text = " ".join(c["explanation"] for c in session.explanation_chunks.get("chunks", []))
-        session.quiz_data = await call_groq_api_for_quiz(session.video_title, explanation_text or session.transcript)
+        session.quiz_data = await call_groq_api_for_quiz(session.video_title, explanation_text or session.transcript, language_name=lang_name)
         session.user_progress = {
             "current_phase": 1, "phase1_passed": False,
             "phase2_passed": False, "phase3_passed": False, "is_completed": False,
@@ -706,6 +729,7 @@ async def get_or_create_quiz(
     return QuizSessionOut(
         session_id=str(session.id), video_id=session.video_id,
         video_title=session.video_title,
+        language=session.language,
         current_unlocked_phase=progress.get("current_phase", 1),
         is_completed=bool(progress.get("is_completed")),
         phase1=p1_out, phase2=p2_out, phase3=p3_out,
@@ -761,7 +785,6 @@ async def submit_quiz_phase(
             correct_count += 1
         else:
             failed_chunk_set.add(q_chunk_id)
-            # Increment user concept gap profile for missed concept category
             gap_stmt = select(UserConceptGap).where(
                 UserConceptGap.user_id == user_uuid,
                 UserConceptGap.concept_category == q_concept_cat
@@ -858,6 +881,7 @@ async def remediate_concept_chunk(
     if not session:
         raise HTTPException(404, "Learning session not found.")
 
+    lang_name = SUPPORTED_LANGUAGES.get(session.language, "English")
     chunks = session.explanation_chunks.get("chunks", [])
     if not chunks:
         raise HTTPException(400, "No explanation chunks available.")
@@ -900,7 +924,7 @@ async def remediate_concept_chunk(
         )
 
     remediation_result = await call_groq_api_for_remediation(
-        session.video_title, concept_title, original_exp
+        session.video_title, concept_title, original_exp, language_name=lang_name
     )
 
     remediation_cache[target_chunk_id] = remediation_result
