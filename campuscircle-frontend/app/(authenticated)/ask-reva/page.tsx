@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { apiRequest, ApiError } from "@/lib/api";
 import { AnonAvatar } from "@/components/AnonAvatar";
 import { useAuth } from "@/context/AuthContext";
@@ -236,7 +238,29 @@ export default function AskRevaPage() {
                       </span>
                       <span className="text-[10px] font-mono opacity-60">{msg.timestamp}</span>
                     </div>
-                    <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                    {isUser ? (
+                      <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                    ) : (
+                      <div className="leading-relaxed [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-2 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:mb-2 [&>h3]:font-bold [&>h3]:text-sm [&>h3]:mt-3 [&>h3]:mb-1.5 [&>h4]:font-bold [&>h4]:text-xs [&>h4]:mt-2 [&>h4]:mb-1 [&>strong]:font-bold [&>a]:text-primary [&>a]:underline [&>pre]:mb-2 [&>hr]:my-2">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            code({className, children, ...props}) {
+                              const isInline = !className?.startsWith("language-");
+                              return isInline ? (
+                                <code className="bg-ink/10 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
+                              ) : (
+                                <pre className="bg-ink/5 p-3 rounded-xl overflow-x-auto mb-3 text-xs">
+                                  <code className={className} {...props}>{children}</code>
+                                </pre>
+                              );
+                            },
+                          }}
+                        >
+                          {msg.text}
+                        </ReactMarkdown>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
