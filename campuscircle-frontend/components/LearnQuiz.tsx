@@ -65,15 +65,15 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
   const [phaseResults, setPhaseResults] = useState<Record<number, SubmitResult>>({});
 
   // 1. Fetch Quiz Session Data
-  const fetchQuizData = useCallback(async () => {
-    setIsLoading(true);
+  const fetchQuizData = useCallback(async (isInitial = false) => {
+    if (isInitial) setIsLoading(true);
     setError(null);
     try {
       const data = await apiRequest<QuizSession>(`/api/v1/learn/${sessionId}/quiz`, {
         method: "POST",
       });
       setQuizSession(data);
-      if (data.current_unlocked_phase) {
+      if (isInitial && data.current_unlocked_phase) {
         setActivePhase(data.current_unlocked_phase);
       }
     } catch (err) {
@@ -88,7 +88,7 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
   }, [sessionId]);
 
   useEffect(() => {
-    fetchQuizData();
+    fetchQuizData(true);
   }, [fetchQuizData]);
 
   // 2. Select Option Handler
@@ -168,7 +168,7 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
         <h3 className="font-display text-lg font-bold text-red-700">Couldn't load quiz</h3>
         <p className="font-sans text-sm text-ink/75">{error}</p>
         <button
-          onClick={fetchQuizData}
+          onClick={() => fetchQuizData(true)}
           className="px-6 py-2 bg-primary text-surface font-sans font-bold text-sm rounded-xl"
         >
           Try Again
