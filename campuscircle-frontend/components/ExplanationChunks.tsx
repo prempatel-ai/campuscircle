@@ -59,18 +59,18 @@ export function ExplanationChunks({
       </div>
 
       {/* Chunk Stepper Navigation */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+      <div className="flex flex-wrap items-center gap-2">
         {chunks.map((chunk, idx) => (
           <button
             key={idx}
             onClick={() => setActiveIndex(idx)}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all shrink-0 cursor-pointer ${
+            className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
               activeIndex === idx
                 ? "bg-primary text-surface shadow-xs"
                 : "bg-surface border border-border-muted text-ink/70 hover:text-ink"
             }`}
           >
-            Part {idx + 1}: {chunk.title.length > 22 ? chunk.title.slice(0, 22) + "..." : chunk.title}
+            Part {idx + 1}
           </button>
         ))}
       </div>
