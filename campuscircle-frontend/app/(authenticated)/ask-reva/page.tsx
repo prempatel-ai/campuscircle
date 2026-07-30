@@ -133,11 +133,11 @@ export default function AskRevaPage() {
                 }
               }}
               placeholder="How can Reva help you today? Ask about code, campus, or tag @reva in posts..."
-              className="w-full bg-transparent text-sm sm:text-base text-ink placeholder:text-ink/40 focus:outline-none resize-none px-2 pt-1 font-sans"
+              className="w-full bg-transparent text-sm sm:text-base text-ink placeholder:text-ink/40 border-0 outline-none focus:outline-none focus:ring-0 focus:border-0 resize-none px-2 pt-1 font-sans shadow-none ring-0"
             />
 
             {/* Controls Bar inside Input Box */}
-            <div className="flex items-center justify-between pt-2 border-t border-border-muted/50 px-2">
+            <div className="flex items-center justify-between pt-1 px-2">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -279,7 +279,7 @@ export default function AskRevaPage() {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="Ask Reva anything about campus posts, code, or coursework..."
-                className="flex-1 px-4 py-2.5 bg-transparent text-sm font-sans text-ink placeholder:text-ink/40 focus:outline-none"
+                className="flex-1 px-4 py-2.5 bg-transparent text-sm font-sans text-ink placeholder:text-ink/40 border-0 outline-none focus:outline-none focus:ring-0 focus:border-0 ring-0"
               />
               <button
                 type="submit"
