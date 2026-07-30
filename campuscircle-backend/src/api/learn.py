@@ -2,7 +2,7 @@ import json
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +25,13 @@ from src.schemas.learn import (
     TranscriptSegment,
     ExplainRequest,
     ExplainResponse,
-    ExplanationChunk
+    ExplanationChunk,
+    QuizQuestionOut,
+    QuizPhaseOut,
+    QuizSessionOut,
+    QuizSubmitRequest,
+    QuestionResultDetail,
+    QuizSubmitResponse
 )
 
 router = APIRouter(prefix="/learn", tags=["learn"])
@@ -77,9 +83,37 @@ def parse_and_validate_chunks(content_str: str) -> List[dict] | None:
     return None
 
 
+def validate_quiz_data_structure(data: dict) -> dict | None:
+    try:
+        if not isinstance(data, dict):
+            return None
+        phases = data.get("phases")
+        if not isinstance(phases, dict):
+            return None
+
+        for phase_key in ["phase1", "phase2", "phase3"]:
+            p_data = phases.get(phase_key)
+            if not isinstance(p_data, dict):
+                return None
+            questions = p_data.get("questions")
+            if not isinstance(questions, list) or len(questions) == 0:
+                return None
+            for q in questions:
+                if not isinstance(q, dict):
+                    return None
+                if not all(k in q for k in ["id", "question", "options", "correct_index", "explanation"]):
+                    return None
+                if not isinstance(q["options"], list) or len(q["options"]) != 4:
+                    return None
+                if not isinstance(q["correct_index"], int) or q["correct_index"] not in [0, 1, 2, 3]:
+                    return None
+        return data
+    except Exception:
+        return None
+
+
 async def call_groq_api_for_explanation(transcript_text: str) -> List[dict]:
     if not settings.groq_api_key:
-        # Graceful fallback storytelling generator if GROQ_API_KEY is not yet configured
         return [
             {
                 "title": "Introduction to the Topic",
@@ -119,7 +153,6 @@ async def call_groq_api_for_explanation(transcript_text: str) -> List[dict]:
     }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
-        # Attempt 1
         res = await client.post(url, headers=headers, json=payload)
         if res.status_code == 200:
             data = res.json()
@@ -128,7 +161,6 @@ async def call_groq_api_for_explanation(transcript_text: str) -> List[dict]:
             if parsed:
                 return parsed
 
-        # Attempt 2 (Retry once if format was invalid or API had transient issue)
         res_retry = await client.post(url, headers=headers, json=payload)
         if res_retry.status_code == 200:
             data = res_retry.json()
@@ -140,6 +172,193 @@ async def call_groq_api_for_explanation(transcript_text: str) -> List[dict]:
     raise HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail="The AI model failed to generate a valid structured JSON explanation. Please try again."
+    )
+
+
+async def call_groq_api_for_quiz(video_title: str, explanation_text: str) -> dict:
+    if not settings.groq_api_key:
+        return {
+            "phases": {
+                "phase1": {
+                    "name": "Recall",
+                    "description": "Test basic memory of core terms and definitions.",
+                    "questions": [
+                        {
+                            "id": "p1_q1",
+                            "question": f"What primary topic is explored in '{video_title}'?",
+                            "options": [
+                                "Foundational concepts and core principles",
+                                "Unrelated historical background",
+                                "Advanced unverified theories",
+                                "Administrative guidelines"
+                            ],
+                            "correct_index": 0,
+                            "explanation": "The material focuses on foundational concepts and core principles."
+                        },
+                        {
+                            "id": "p1_q2",
+                            "question": "Why are basic building blocks established early in the lesson?",
+                            "options": [
+                                "To confuse first-time learners",
+                                "To build a solid mental framework for practical applications",
+                                "To meet arbitrary word length rules",
+                                "To skip real-world examples"
+                            ],
+                            "correct_index": 1,
+                            "explanation": "Building blocks provide a mental framework for applying concepts later."
+                        },
+                        {
+                            "id": "p1_q3",
+                            "question": "How should a first-time learner approach key terms?",
+                            "options": [
+                                "Memorize without understanding context",
+                                "Ignore definitions completely",
+                                "Connect definitions to practical scenario examples",
+                                "Rely solely on luck"
+                            ],
+                            "correct_index": 2,
+                            "explanation": "Connecting terms to real-world scenarios solidifies understanding."
+                        }
+                    ]
+                },
+                "phase2": {
+                    "name": "Application",
+                    "description": "Apply concepts to real-world scenarios.",
+                    "questions": [
+                        {
+                            "id": "p2_q1",
+                            "question": "If you encounter a bottleneck when applying these principles, what is the best first step?",
+                            "options": [
+                                "Abandon the solution",
+                                "Analyze system components and trace the execution path",
+                                "Randomly change configuration settings",
+                                "Blame external dependencies"
+                            ],
+                            "correct_index": 1,
+                            "explanation": "Tracing the execution path pinpoints the exact component causing the bottleneck."
+                        },
+                        {
+                            "id": "p2_q2",
+                            "question": "How does scenario framing help in problem solving?",
+                            "options": [
+                                "It forces you to isolate variables and predict outcomes",
+                                "It adds unnecessary complexity",
+                                "It hides underlying technical flaws",
+                                "It eliminates the need for testing"
+                            ],
+                            "correct_index": 0,
+                            "explanation": "Scenario framing helps isolate variables and accurately predict system behavior."
+                        },
+                        {
+                            "id": "p2_q3",
+                            "question": "Which trade-off is typically evaluated during practical implementation?",
+                            "options": [
+                                "Simplicity vs Scalability",
+                                "Color scheme vs Font choice",
+                                "User count vs Server location",
+                                "None of the above"
+                            ],
+                            "correct_index": 0,
+                            "explanation": "Engineers balance architectural simplicity against future scaling demands."
+                        }
+                    ]
+                },
+                "phase3": {
+                    "name": "Synthesis",
+                    "description": "Synthesize knowledge to evaluate complex systems.",
+                    "questions": [
+                        {
+                            "id": "p3_q1",
+                            "question": "How do the core principles combine to ensure long-term system reliability?",
+                            "options": [
+                                "By establishing modular boundaries and automated verification",
+                                "By relying on manual inspection",
+                                "By ignoring edge cases",
+                                "By hardcoding variable parameters"
+                            ],
+                            "correct_index": 0,
+                            "explanation": "Modular boundaries and automated verification ensure long-term resilience."
+                        },
+                        {
+                            "id": "p3_q2",
+                            "question": "What is the ultimate goal of mastering this topic?",
+                            "options": [
+                                "To pass a single test",
+                                "To design, evaluate, and adapt solutions to novel challenges",
+                                "To copy existing templates verbatim",
+                                "To avoid technical discussions"
+                            ],
+                            "correct_index": 1,
+                            "explanation": "True mastery allows you to synthesize knowledge and adapt solutions to new challenges."
+                        },
+                        {
+                            "id": "p3_q3",
+                            "question": "When evaluating two competing technical architectures, which criterion is paramount?",
+                            "options": [
+                                "Popularity on social media",
+                                "Alignment with domain constraints and maintainability",
+                                "Shortest code line count",
+                                "Arbitrary preference"
+                            ],
+                            "correct_index": 1,
+                            "explanation": "Maintainability and alignment with domain constraints drive optimal architectural choices."
+                        }
+                    ]
+                }
+            }
+        }
+
+    system_prompt = (
+        "You are an expert AI assessment designer. Create a 3-phase multiple-choice quiz based on the provided material. "
+        "You MUST return a JSON object containing a top-level key 'phases'. 'phases' MUST contain three keys: 'phase1', 'phase2', and 'phase3'.\n"
+        "- 'phase1': Name 'Recall' (basic fact/concept recall). 'questions': list of 3 questions.\n"
+        "- 'phase2': Name 'Application' (scenario/practical application). 'questions': list of 3 questions.\n"
+        "- 'phase3': Name 'Synthesis' (analytical evaluation/synthesis). 'questions': list of 3 questions.\n\n"
+        "Each question object MUST contain:\n"
+        "- 'id': string (e.g. 'p1_q1', 'p1_q2', 'p1_q3', 'p2_q1'...)\n"
+        "- 'question': string question text\n"
+        "- 'options': list of exactly 4 string options [option0, option1, option2, option3]\n"
+        "- 'correct_index': integer (0, 1, 2, or 3) indicating the zero-based index of the correct option\n"
+        "- 'explanation': string explaining why that option is correct."
+    )
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings.groq_api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": settings.groq_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Generate a 3-phase quiz for video '{video_title}':\n\n{explanation_text[:12000]}"}
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.3
+    }
+
+    async with httpx.AsyncClient(timeout=35.0) as client:
+        res = await client.post(url, headers=headers, json=payload)
+        if res.status_code == 200:
+            data = res.json()
+            content = data["choices"][0]["message"]["content"]
+            parsed_json = json.loads(content) if isinstance(content, str) else content
+            validated = validate_quiz_data_structure(parsed_json)
+            if validated:
+                return validated
+
+        res_retry = await client.post(url, headers=headers, json=payload)
+        if res_retry.status_code == 200:
+            data = res_retry.json()
+            content = data["choices"][0]["message"]["content"]
+            parsed_json = json.loads(content) if isinstance(content, str) else content
+            validated = validate_quiz_data_structure(parsed_json)
+            if validated:
+                return validated
+
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="Failed to generate valid structured quiz JSON from AI model. Please try again."
     )
 
 
@@ -156,7 +375,6 @@ async def extract_youtube_transcript(
 ):
     user_uuid = uuid.UUID(current_user["user_id"])
 
-    # 1. Validate YouTube URL & extract Video ID
     video_id = extract_video_id(payload.youtube_url)
     if not video_id:
         raise HTTPException(
@@ -164,7 +382,6 @@ async def extract_youtube_transcript(
             detail="Invalid YouTube URL. Please provide a valid YouTube watch link or Short URL."
         )
 
-    # 2. Rate limit check (Max 10 extractions per 24 hours)
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
     count_stmt = select(func.count(LearnExtractionLog.id)).where(
         LearnExtractionLog.user_id == user_uuid,
@@ -179,7 +396,6 @@ async def extract_youtube_transcript(
             detail=f"Daily extraction limit reached ({EXTRACTION_DAILY_LIMIT} extractions per 24 hours). Please try again tomorrow."
         )
 
-    # 3. Extract Transcript using youtube-transcript-api
     try:
         try:
             raw_transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'en-GB'])
@@ -206,7 +422,6 @@ async def extract_youtube_transcript(
             detail=f"Failed to extract transcript: {str(e)}"
         )
 
-    # 4. Process segments & metadata
     segments = [
         TranscriptSegment(
             text=item.get("text", "").replace("\n", " ").strip(),
@@ -221,7 +436,6 @@ async def extract_youtube_transcript(
 
     video_title = await fetch_video_title(video_id)
 
-    # 5. Log extraction for rate limiting
     log_entry = LearnExtractionLog(user_id=user_uuid, video_id=video_id)
     db.add(log_entry)
     await db.commit()
@@ -253,7 +467,6 @@ async def explain_youtube_transcript(
 ):
     user_uuid = uuid.UUID(current_user["user_id"])
 
-    # 1. Extract Video ID
     video_id = extract_video_id(payload.youtube_url)
     if not video_id:
         raise HTTPException(
@@ -261,7 +474,6 @@ async def explain_youtube_transcript(
             detail="Invalid YouTube URL. Please provide a valid YouTube watch link or Short URL."
         )
 
-    # 2. Check DB Cache first (Keyed by video_id) — avoids re-calling Groq API!
     cache_stmt = (
         select(LearningSession)
         .where(LearningSession.video_id == video_id)
@@ -270,7 +482,6 @@ async def explain_youtube_transcript(
     cache_res = await db.execute(cache_stmt)
     cached_session = cache_res.scalars().first()
 
-    # Calculate user's remaining daily explanation quota
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
     user_count_stmt = select(func.count(LearningSession.id)).where(
         LearningSession.user_id == user_uuid,
@@ -280,7 +491,6 @@ async def explain_youtube_transcript(
     user_daily_explanations = user_count_res.scalar_one() or 0
 
     if cached_session:
-        # Return cached explanation directly without hitting Groq API
         raw_chunks = cached_session.explanation_chunks.get("chunks", [])
         chunk_models = [ExplanationChunk(title=c["title"], explanation=c["explanation"]) for c in raw_chunks]
         return ExplainResponse(
@@ -292,14 +502,12 @@ async def explain_youtube_transcript(
             daily_explanations_remaining=max(0, EXPLAIN_DAILY_LIMIT - user_daily_explanations)
         )
 
-    # 3. Rate Limit Check for new AI API calls (Max 5 explanations per 24 hours)
     if user_daily_explanations >= EXPLAIN_DAILY_LIMIT:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Daily explanation limit reached ({EXPLAIN_DAILY_LIMIT} explanations per 24 hours)."
         )
 
-    # 4. Get transcript text (from payload or extract live)
     transcript_text = payload.transcript.strip() if payload.transcript else None
     video_title = await fetch_video_title(video_id) or f"YouTube Video ({video_id})"
 
@@ -319,10 +527,8 @@ async def explain_youtube_transcript(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to fetch transcript: {str(e)}")
 
-    # 5. Call Groq API for storytelling chunks
     chunks_data = await call_groq_api_for_explanation(transcript_text)
 
-    # 6. Cache in DB (LearningSession)
     new_session = LearningSession(
         user_id=user_uuid,
         video_id=video_id,
@@ -345,4 +551,220 @@ async def explain_youtube_transcript(
         chunks=chunk_models,
         is_cached=False,
         daily_explanations_remaining=max(0, remaining)
+    )
+
+
+def sanitize_phase_questions(phase_dict: dict) -> List[QuizQuestionOut]:
+    questions = phase_dict.get("questions", [])
+    sanitized = []
+    for q in questions:
+        sanitized.append(
+            QuizQuestionOut(
+                id=q["id"],
+                question=q["question"],
+                options=q["options"]
+            )
+        )
+    return sanitized
+
+
+@router.post(
+    "/{session_id}/quiz",
+    response_model=QuizSessionOut,
+    status_code=status.HTTP_200_OK,
+    summary="Get or generate 3-phase adaptive quiz for a learning session"
+)
+async def get_or_create_quiz(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Learning session not found.")
+
+    stmt = select(LearningSession).where(LearningSession.id == session_uuid)
+    res = await db.execute(stmt)
+    session = res.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Learning session not found.")
+
+    # Generate quiz if not yet generated for this session
+    if not session.quiz_data:
+        explanation_text = " ".join([c["explanation"] for c in session.explanation_chunks.get("chunks", [])])
+        quiz_json = await call_groq_api_for_quiz(session.video_title, explanation_text or session.transcript)
+        session.quiz_data = quiz_json
+        session.user_progress = {
+            "current_phase": 1,
+            "phase1_passed": False,
+            "phase2_passed": False,
+            "phase3_passed": False,
+            "is_completed": False
+        }
+        db.add(session)
+        await db.commit()
+        await db.refresh(session)
+
+    progress = session.user_progress or {
+        "current_phase": 1,
+        "phase1_passed": False,
+        "phase2_passed": False,
+        "phase3_passed": False,
+        "is_completed": False
+    }
+
+    phases_data = session.quiz_data.get("phases", {})
+    p1_raw = phases_data.get("phase1", {})
+    p2_raw = phases_data.get("phase2", {})
+    p3_raw = phases_data.get("phase3", {})
+
+    p1_out = QuizPhaseOut(
+        phase=1,
+        name=p1_raw.get("name", "Recall"),
+        description=p1_raw.get("description", "Recall facts & core terms"),
+        is_unlocked=True,
+        is_passed=bool(progress.get("phase1_passed")),
+        questions=sanitize_phase_questions(p1_raw)
+    )
+
+    p2_out = None
+    if progress.get("phase1_passed"):
+        p2_out = QuizPhaseOut(
+            phase=2,
+            name=p2_raw.get("name", "Application"),
+            description=p2_raw.get("description", "Apply concepts to practical scenarios"),
+            is_unlocked=True,
+            is_passed=bool(progress.get("phase2_passed")),
+            questions=sanitize_phase_questions(p2_raw)
+        )
+
+    p3_out = None
+    if progress.get("phase2_passed"):
+        p3_out = QuizPhaseOut(
+            phase=3,
+            name=p3_raw.get("name", "Synthesis"),
+            description=p3_raw.get("description", "Synthesize & evaluate complex ideas"),
+            is_unlocked=True,
+            is_passed=bool(progress.get("phase3_passed")),
+            questions=sanitize_phase_questions(p3_raw)
+        )
+
+    return QuizSessionOut(
+        session_id=str(session.id),
+        video_id=session.video_id,
+        video_title=session.video_title,
+        current_unlocked_phase=progress.get("current_phase", 1),
+        is_completed=bool(progress.get("is_completed")),
+        phase1=p1_out,
+        phase2=p2_out,
+        phase3=p3_out
+    )
+
+
+@router.post(
+    "/{session_id}/quiz/{phase}/submit",
+    response_model=QuizSubmitResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Submit answers for a quiz phase and grade locally without AI calls"
+)
+async def submit_quiz_phase(
+    session_id: str,
+    phase: int,
+    payload: QuizSubmitRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if phase not in [1, 2, 3]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phase must be 1, 2, or 3.")
+
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Learning session not found.")
+
+    stmt = select(LearningSession).where(LearningSession.id == session_uuid)
+    res = await db.execute(stmt)
+    session = res.scalar_one_or_none()
+
+    if not session or not session.quiz_data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz session not found.")
+
+    progress = session.user_progress or {
+        "current_phase": 1,
+        "phase1_passed": False,
+        "phase2_passed": False,
+        "phase3_passed": False,
+        "is_completed": False
+    }
+
+    # Gating checks
+    if phase == 2 and not progress.get("phase1_passed"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phase 1 must be passed before attempting Phase 2.")
+    if phase == 3 and not progress.get("phase2_passed"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phase 2 must be passed before attempting Phase 3.")
+
+    phase_key = f"phase{phase}"
+    phase_questions = session.quiz_data.get("phases", {}).get(phase_key, {}).get("questions", [])
+
+    if not phase_questions:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"No questions found for phase {phase}.")
+
+    correct_count = 0
+    total_questions = len(phase_questions)
+    details: List[QuestionResultDetail] = []
+
+    # Pure Python server-side grading (0 AI calls)
+    for q in phase_questions:
+        q_id = q["id"]
+        correct_idx = q["correct_index"]
+        user_idx = payload.answers.get(q_id, -1)
+        is_correct = (user_idx == correct_idx)
+
+        if is_correct:
+            correct_count += 1
+
+        details.append(
+            QuestionResultDetail(
+                question_id=q_id,
+                user_index=user_idx,
+                correct_index=correct_idx,
+                is_correct=is_correct,
+                explanation=q.get("explanation", "")
+            )
+        )
+
+    score_percent = round((correct_count / total_questions) * 100.0, 1)
+    passed = (score_percent >= 70.0)
+
+    # Update progress if passed
+    next_unlocked = None
+    if passed:
+        if phase == 1:
+            progress["phase1_passed"] = True
+            progress["current_phase"] = max(progress.get("current_phase", 1), 2)
+            next_unlocked = 2
+        elif phase == 2:
+            progress["phase2_passed"] = True
+            progress["current_phase"] = max(progress.get("current_phase", 1), 3)
+            next_unlocked = 3
+        elif phase == 3:
+            progress["phase3_passed"] = True
+            progress["is_completed"] = True
+
+        session.user_progress = progress
+        db.add(session)
+        await db.commit()
+
+    return QuizSubmitResponse(
+        phase=phase,
+        passed=passed,
+        score_percent=score_percent,
+        correct_count=correct_count,
+        total_questions=total_questions,
+        passing_threshold_percent=70.0,
+        next_phase_unlocked=next_unlocked,
+        is_session_completed=bool(progress.get("is_completed")),
+        details=details
     )

@@ -40,3 +40,53 @@ class ExplainResponse(BaseModel):
     chunks: List[ExplanationChunk]
     is_cached: bool
     daily_explanations_remaining: int
+
+
+class QuizQuestionOut(BaseModel):
+    id: str
+    question: str
+    options: List[str]
+
+
+class QuizPhaseOut(BaseModel):
+    phase: int
+    name: str
+    description: str
+    is_unlocked: bool
+    is_passed: bool
+    questions: List[QuizQuestionOut]
+
+
+class QuizSessionOut(BaseModel):
+    session_id: str
+    video_id: str
+    video_title: str
+    current_unlocked_phase: int
+    is_completed: bool
+    phase1: QuizPhaseOut
+    phase2: Optional[QuizPhaseOut] = None
+    phase3: Optional[QuizPhaseOut] = None
+
+
+class QuizSubmitRequest(BaseModel):
+    answers: dict[str, int] = Field(..., description="Mapping of question_id to selected option index (0..3)")
+
+
+class QuestionResultDetail(BaseModel):
+    question_id: str
+    user_index: int
+    correct_index: int
+    is_correct: bool
+    explanation: str
+
+
+class QuizSubmitResponse(BaseModel):
+    phase: int
+    passed: bool
+    score_percent: float
+    correct_count: int
+    total_questions: int
+    passing_threshold_percent: float = 70.0
+    next_phase_unlocked: Optional[int] = None
+    is_session_completed: bool
+    details: List[QuestionResultDetail]
