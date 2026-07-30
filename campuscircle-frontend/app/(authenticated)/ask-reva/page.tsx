@@ -29,7 +29,6 @@ export default function AskRevaPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic greeting based on current hour
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -100,12 +99,58 @@ export default function AskRevaPage() {
   const username = user?.username || "student";
   const hasStarted = messages.length > 0;
 
+  // Shared Grok / Claude style Input Box component for perfect UI consistency
+  const renderGrokInputBox = (compact = false) => (
+    <div className={`w-full bg-surface border border-border-muted/90 rounded-3xl shadow-md transition-all ${compact ? "p-3 space-y-2" : "p-4 space-y-3"}`}>
+      <textarea
+        rows={compact ? 2 : 3}
+        value={inputText}
+        onChange={(e) => setInputText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+          }
+        }}
+        placeholder="How can Reva help you today? Ask about code, campus, or tag @reva in posts..."
+        className="w-full bg-transparent text-sm sm:text-base text-ink placeholder:text-ink/40 border-0 outline-none focus:outline-none focus:ring-0 focus:border-0 resize-none px-2 pt-1 font-sans shadow-none ring-0"
+      />
+
+      <div className="flex items-center justify-between pt-1 px-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setModelMode(modelMode === "fast" ? "thinking" : "fast")}
+            className="px-3 py-1 bg-background border border-border-muted hover:border-primary/40 rounded-full text-xs font-mono font-bold text-ink/75 transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>{modelMode === "fast" ? "Fast Model" : "Deep Think"}</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleSendMessage()}
+            disabled={!inputText.trim() || isLoading}
+            className="w-9 h-9 bg-primary hover:bg-[#1F3E23] text-surface rounded-full flex items-center justify-center transition-all disabled:opacity-30 cursor-pointer shadow-xs"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex-1 text-ink font-sans max-w-4xl mx-auto w-full px-4 py-6 flex flex-col min-h-[calc(100vh-5rem)]">
       {!hasStarted ? (
-        /* HERO INITIAL STATE (Claude / Grok Center Layout) */
+        /* HERO INITIAL STATE */
         <div className="flex-1 flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-300 py-12">
-          {/* Emblem Icon */}
           <div className="space-y-3 text-center">
             <div className="w-14 h-14 bg-primary text-surface rounded-2xl flex items-center justify-center mx-auto shadow-md transform hover:scale-105 transition-transform">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,53 +165,10 @@ export default function AskRevaPage() {
             </p>
           </div>
 
-          {/* GROK / CLAUDE SLEEK INPUT BOX */}
-          <div className="w-full max-w-2xl bg-surface border border-border-muted/90 rounded-3xl p-4 shadow-md space-y-3">
-            <textarea
-              rows={3}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-              placeholder="How can Reva help you today? Ask about code, campus, or tag @reva in posts..."
-              className="w-full bg-transparent text-sm sm:text-base text-ink placeholder:text-ink/40 border-0 outline-none focus:outline-none focus:ring-0 focus:border-0 resize-none px-2 pt-1 font-sans shadow-none ring-0"
-            />
-
-            {/* Controls Bar inside Input Box */}
-            <div className="flex items-center justify-between pt-1 px-2">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setModelMode(modelMode === "fast" ? "thinking" : "fast")}
-                  className="px-3 py-1 bg-background border border-border-muted hover:border-primary/40 rounded-full text-xs font-mono font-bold text-ink/75 transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <svg className="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <span>{modelMode === "fast" ? "Fast Model" : "Deep Think"}</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleSendMessage()}
-                  disabled={!inputText.trim() || isLoading}
-                  className="w-9 h-9 bg-primary hover:bg-[#1F3E23] text-surface rounded-full flex items-center justify-center transition-all disabled:opacity-30 cursor-pointer shadow-xs"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+          <div className="w-full max-w-2xl">
+            {renderGrokInputBox(false)}
           </div>
 
-          {/* CATEGORY CHIPS */}
           <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
             {CATEGORY_CHIPS.map((chip) => (
               <button
@@ -185,7 +187,6 @@ export default function AskRevaPage() {
       ) : (
         /* ACTIVE CONVERSATION STATE */
         <div className="flex-1 flex flex-col h-full space-y-4">
-          {/* Header */}
           <div className="bg-surface border border-border-muted rounded-2xl p-4 shadow-2xs flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-primary text-surface flex items-center justify-center font-mono font-bold text-sm shadow-xs">
@@ -205,7 +206,6 @@ export default function AskRevaPage() {
             </button>
           </div>
 
-          {/* Messages Stream */}
           <div className="flex-1 bg-surface border border-border-muted rounded-2xl p-4 sm:p-6 overflow-y-auto space-y-4 shadow-2xs min-h-0">
             {messages.map((msg) => {
               const isUser = msg.sender === "user";
@@ -259,7 +259,6 @@ export default function AskRevaPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Floating Input Bar */}
           <div className="pt-2 space-y-2 shrink-0">
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs font-sans text-red-700">
@@ -267,28 +266,7 @@ export default function AskRevaPage() {
               </div>
             )}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendMessage();
-              }}
-              className="flex items-center gap-2 bg-surface border border-border-muted rounded-2xl p-2 shadow-2xs"
-            >
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Ask Reva anything about campus posts, code, or coursework..."
-                className="flex-1 px-4 py-2.5 bg-transparent text-sm font-sans text-ink placeholder:text-ink/40 border-0 outline-none focus:outline-none focus:ring-0 focus:border-0 ring-0"
-              />
-              <button
-                type="submit"
-                disabled={!inputText.trim() || isLoading}
-                className="px-5 py-2.5 bg-primary hover:bg-[#1F3E23] text-surface font-sans font-bold text-xs rounded-xl transition-all shadow-xs disabled:opacity-40 cursor-pointer shrink-0"
-              >
-                Send
-              </button>
-            </form>
+            {renderGrokInputBox(true)}
           </div>
         </div>
       )}
