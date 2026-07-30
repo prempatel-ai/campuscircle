@@ -99,6 +99,19 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 </svg>
                 <span>Learn</span>
               </Link>
+              <Link
+                href="/ask-reva"
+                className={`px-3 py-1.5 rounded-lg text-xs font-sans font-bold transition-all flex items-center gap-1.5 ${
+                  pathname.startsWith("/ask-reva")
+                    ? "bg-primary/10 text-primary"
+                    : "text-ink/60 hover:text-ink hover:bg-background"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                <span>Ask Reva</span>
+              </Link>
             </nav>
           </div>
 
