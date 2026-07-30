@@ -239,5 +239,7 @@ The frontend application will be running at `http://localhost:3000`.
 - Add `NEXT_PUBLIC_API_URL` pointing to your deployed backend URL.
 
 ---
+## License
 
+Distributed under the MIT License. See `LICENSE` for more information.
 
