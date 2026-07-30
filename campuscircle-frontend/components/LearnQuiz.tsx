@@ -7,6 +7,8 @@ interface Question {
   id: string;
   question: string;
   options: string[];
+  chunk_id?: string;
+  concept_category?: string;
 }
 
 interface PhaseData {
@@ -35,6 +37,9 @@ interface QuestionDetail {
   correct_index: number;
   is_correct: boolean;
   explanation: string;
+  chunk_id?: string;
+  concept_title?: string;
+  concept_category?: string;
 }
 
 interface SubmitResult {
@@ -47,6 +52,22 @@ interface SubmitResult {
   next_phase_unlocked: number | null;
   is_session_completed: boolean;
   details: QuestionDetail[];
+  failed_chunk_ids?: string[];
+}
+
+interface RemediateData {
+  session_id: string;
+  chunk_id: string;
+  concept_title: string;
+  re_explanation: string;
+  analogy?: string;
+  is_cached: boolean;
+}
+
+interface ConceptGap {
+  concept_category: string;
+  miss_count: number;
+  last_seen_at: string;
 }
 
 interface LearnQuizProps {
@@ -63,6 +84,10 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [phaseResults, setPhaseResults] = useState<Record<number, SubmitResult>>({});
+  const [remediations, setRemediations] = useState<Record<string, RemediateData>>({});
+  const [loadingRemediationChunk, setLoadingRemediationChunk] = useState<string | null>(null);
+
+  const [userGaps, setUserGaps] = useState<ConceptGap[]>([]);
 
   // 1. Fetch Quiz Session Data
   const fetchQuizData = useCallback(async (isInitial = false) => {
@@ -87,11 +112,22 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
     }
   }, [sessionId]);
 
+  // 2. Fetch User Concept Gaps Profile
+  const fetchUserGaps = useCallback(async () => {
+    try {
+      const data = await apiRequest<{ gaps: ConceptGap[] }>("/api/v1/learn/me/gaps");
+      setUserGaps(data.gaps || []);
+    } catch (err) {
+      // Non-critical, ignore
+    }
+  }, []);
+
   useEffect(() => {
     fetchQuizData(true);
-  }, [fetchQuizData]);
+    fetchUserGaps();
+  }, [fetchQuizData, fetchUserGaps]);
 
-  // 2. Select Option Handler
+  // 3. Select Option Handler
   const handleSelectOption = (questionId: string, optionIdx: number) => {
     setSelectedAnswers((prev) => ({
       ...prev,
@@ -99,7 +135,7 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
     }));
   };
 
-  // 3. Submit Phase Handler
+  // 4. Submit Phase Handler
   const handleSubmitPhase = async (phaseNum: number) => {
     const currentPhaseData =
       phaseNum === 1
@@ -110,7 +146,6 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
 
     if (!currentPhaseData) return;
 
-    // Ensure all questions have an answer selected
     const unanswered = currentPhaseData.questions.filter(
       (q) => selectedAnswers[q.id] === undefined
     );
@@ -136,8 +171,8 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
         [phaseNum]: result,
       }));
 
-      // Re-fetch quiz session to update unlocked status across phases
-      await fetchQuizData();
+      await fetchQuizData(false);
+      await fetchUserGaps();
 
       if (result.passed && result.next_phase_unlocked) {
         setActivePhase(result.next_phase_unlocked);
@@ -151,6 +186,45 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // 5. Remediation Fetcher
+  const handleFetchRemediation = async (chunkId: string) => {
+    setLoadingRemediationChunk(chunkId);
+    try {
+      const data = await apiRequest<RemediateData>(`/api/v1/learn/${sessionId}/remediate`, {
+        method: "POST",
+        body: JSON.stringify({ chunk_id: chunkId }),
+      });
+      setRemediations((prev) => ({
+        ...prev,
+        [chunkId]: data,
+      }));
+    } catch (err) {
+      setError("Failed to fetch targeted concept remediation.");
+    } finally {
+      setLoadingRemediationChunk(null);
+    }
+  };
+
+  // 6. Targeted Retry Handler (Clears answers for questions tied to remediated chunk)
+  const handleRetryChunkQuestions = (chunkId: string) => {
+    if (!currentPhaseInfo) return;
+    setSelectedAnswers((prev) => {
+      const updated = { ...prev };
+      currentPhaseInfo.questions.forEach((q) => {
+        if (q.chunk_id === chunkId) {
+          delete updated[q.id];
+        }
+      });
+      return updated;
+    });
+    // Clear result banner so user can submit again
+    setPhaseResults((prev) => {
+      const updated = { ...prev };
+      delete updated[activePhase];
+      return updated;
+    });
   };
 
   if (isLoading) {
@@ -169,7 +243,7 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
         <p className="font-sans text-sm text-ink/75">{error}</p>
         <button
           onClick={() => fetchQuizData(true)}
-          className="px-6 py-2 bg-primary text-surface font-sans font-bold text-sm rounded-xl"
+          className="px-6 py-2 bg-primary text-surface font-sans font-bold text-sm rounded-xl cursor-pointer"
         >
           Try Again
         </button>
@@ -301,10 +375,10 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
           {/* Submit Result Banner if graded */}
           {currentResult && (
             <div
-              className={`border rounded-2xl p-5 space-y-2 shadow-2xs ${
+              className={`border rounded-2xl p-5 space-y-4 shadow-2xs ${
                 currentResult.passed
                   ? "bg-primary/10 border-primary/30"
-                  : "bg-red-50 border-red-200"
+                  : "bg-red-50/80 border-red-200"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -320,8 +394,77 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
                   ? currentResult.next_phase_unlocked
                     ? `Great job! Phase ${currentResult.next_phase_unlocked} is now unlocked.`
                     : "Congratulations! You have completed all 3 quiz phases."
-                  : "Review the question explanations below and try again to unlock the next phase."}
+                  : "Check the targeted micro-explanations below for your missed concepts and retry!"}
               </p>
+
+              {/* TARGETED CONCEPT REMEDIATION SECTION */}
+              {currentResult.failed_chunk_ids && currentResult.failed_chunk_ids.length > 0 && (
+                <div className="pt-3 border-t border-border-muted/40 space-y-3">
+                  <span className="text-xs font-mono font-bold text-red-800 uppercase flex items-center gap-1.5">
+                    <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Targeted Real-Time Remediation Available ({currentResult.failed_chunk_ids.length} concept gap{currentResult.failed_chunk_ids.length > 1 ? "s" : ""})
+                  </span>
+
+                  <div className="space-y-3">
+                    {currentResult.failed_chunk_ids.map((chunkId) => {
+                      const remData = remediations[chunkId];
+                      const isLoadingThis = loadingRemediationChunk === chunkId;
+
+                      // Find concept title from details
+                      const matchingDetail = currentResult.details.find((d) => d.chunk_id === chunkId);
+                      const conceptName = matchingDetail?.concept_title || matchingDetail?.concept_category || chunkId;
+
+                      return (
+                        <div key={chunkId} className="bg-surface border border-border-muted rounded-xl p-4 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-display text-xs font-bold text-ink">
+                              Concept Gap: {conceptName}
+                            </span>
+                            {!remData && (
+                              <button
+                                onClick={() => handleFetchRemediation(chunkId)}
+                                disabled={isLoadingThis}
+                                className="px-3 py-1.5 bg-primary hover:bg-[#1F3E23] text-surface text-xs font-sans font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                              >
+                                {isLoadingThis ? "Generating micro-explanation..." : "Remediate This Concept"}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Render Remediation Card if fetched */}
+                          {remData && (
+                            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-2 animate-in fade-in duration-200">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-mono font-bold text-primary uppercase">
+                                  Fresh Micro-Explanation {remData.is_cached ? "(Cached)" : ""}
+                                </span>
+                                {remData.analogy && (
+                                  <span className="text-[11px] font-sans text-ink/60 font-medium">
+                                    Analogy: {remData.analogy}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="font-sans text-xs text-ink/80 leading-relaxed">
+                                {remData.re_explanation}
+                              </p>
+                              <div className="pt-2 flex justify-end">
+                                <button
+                                  onClick={() => handleRetryChunkQuestions(chunkId)}
+                                  className="px-3 py-1 bg-surface border border-primary/30 text-primary hover:bg-primary hover:text-surface text-xs font-mono font-bold rounded-lg transition-all cursor-pointer"
+                                >
+                                  Retry Concept Questions
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -344,10 +487,18 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
                   className="bg-surface border border-border-muted rounded-2xl p-6 shadow-2xs space-y-4"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <h4 className="font-display text-sm font-bold text-ink leading-snug">
-                      <span className="text-primary font-mono mr-1.5">{qIdx + 1}.</span>
-                      {q.question}
-                    </h4>
+                    <div className="space-y-1">
+                      <h4 className="font-display text-sm font-bold text-ink leading-snug">
+                        <span className="text-primary font-mono mr-1.5">{qIdx + 1}.</span>
+                        {q.question}
+                      </h4>
+                      {q.concept_category && (
+                        <span className="inline-block px-2 py-0.5 bg-background border border-border-muted text-ink/60 font-mono text-[10px] rounded-md">
+                          Topic Tag: {q.concept_category}
+                        </span>
+                      )}
+                    </div>
+
                     {detail && (
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold shrink-0 ${
@@ -420,6 +571,39 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
             >
               {isSubmitting ? "Grading..." : `Submit Phase ${activePhase} Answers`}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* USER CONCEPT GAPS PROFILE BANNER */}
+      {userGaps.length > 0 && (
+        <div className="bg-surface border border-border-muted rounded-2xl p-6 shadow-2xs space-y-3 pt-6 border-t-2 border-t-primary/30">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-bold text-primary uppercase">
+              Your Concept Gap Profile
+            </span>
+            <span className="px-2 py-0.5 bg-red-100 text-red-800 text-[11px] font-mono font-bold rounded-full">
+              {userGaps.length} Weak Area{userGaps.length > 1 ? "s" : ""} Tracked
+            </span>
+          </div>
+          <p className="font-sans text-xs text-ink/75">
+            Concepts you miss across different videos are automatically tracked here so you know exactly where to focus your revision.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+            {userGaps.map((gap, gIdx) => (
+              <div key={gIdx} className="bg-background border border-border-muted rounded-xl p-3.5 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <h5 className="font-display text-xs font-bold text-ink">{gap.concept_category}</h5>
+                  <p className="font-sans text-[11px] text-ink/50">
+                    Last missed: {new Date(gap.last_seen_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 font-mono text-xs font-bold rounded-lg">
+                  {gap.miss_count} miss{gap.miss_count > 1 ? "es" : ""}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
