@@ -417,9 +417,15 @@ async def extract_youtube_transcript(
             detail="The specified YouTube video is unavailable or private."
         )
     except Exception as e:
+        err_msg = str(e)
+        if "Too Many Requests" in err_msg or "google.com/sorry" in err_msg or "429" in err_msg:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="YouTube rate limit / bot protection was triggered on the cloud server IP. Please try another video or paste the transcript text directly."
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to extract transcript: {str(e)}"
+            detail=f"Failed to extract transcript: {err_msg}"
         )
 
     segments = [
@@ -525,7 +531,13 @@ async def explain_youtube_transcript(
         except VideoUnavailable:
             raise HTTPException(status_code=404, detail="The specified video is unavailable.")
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to fetch transcript: {str(e)}")
+            err_msg = str(e)
+            if "Too Many Requests" in err_msg or "google.com/sorry" in err_msg or "429" in err_msg:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="YouTube rate limit / bot protection was triggered on the cloud server IP. Please try another video or paste the transcript text directly."
+                )
+            raise HTTPException(status_code=400, detail=f"Failed to fetch transcript: {err_msg}")
 
     chunks_data = await call_groq_api_for_explanation(transcript_text)
 
