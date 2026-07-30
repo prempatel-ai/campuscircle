@@ -1,0 +1,424 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import { apiRequest, ApiError } from "@/lib/api";
+
+interface Question {
+  id: string;
+  question: string;
+  options: string[];
+}
+
+interface PhaseData {
+  phase: number;
+  name: string;
+  description: string;
+  is_unlocked: boolean;
+  is_passed: boolean;
+  questions: Question[];
+}
+
+interface QuizSession {
+  session_id: string;
+  video_id: string;
+  video_title: string;
+  current_unlocked_phase: number;
+  is_completed: boolean;
+  phase1: PhaseData;
+  phase2: PhaseData | null;
+  phase3: PhaseData | null;
+}
+
+interface QuestionDetail {
+  question_id: string;
+  user_index: number;
+  correct_index: number;
+  is_correct: boolean;
+  explanation: string;
+}
+
+interface SubmitResult {
+  phase: number;
+  passed: boolean;
+  score_percent: number;
+  correct_count: number;
+  total_questions: number;
+  passing_threshold_percent: number;
+  next_phase_unlocked: number | null;
+  is_session_completed: boolean;
+  details: QuestionDetail[];
+}
+
+interface LearnQuizProps {
+  sessionId: string;
+  onBackToExplanation: () => void;
+}
+
+export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
+  const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
+  const [activePhase, setActivePhase] = useState<number>(1);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [phaseResults, setPhaseResults] = useState<Record<number, SubmitResult>>({});
+
+  // 1. Fetch Quiz Session Data
+  const fetchQuizData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await apiRequest<QuizSession>(`/api/v1/learn/${sessionId}/quiz`, {
+        method: "POST",
+      });
+      setQuizSession(data);
+      if (data.current_unlocked_phase) {
+        setActivePhase(data.current_unlocked_phase);
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Failed to load quiz session.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    fetchQuizData();
+  }, [fetchQuizData]);
+
+  // 2. Select Option Handler
+  const handleSelectOption = (questionId: string, optionIdx: number) => {
+    setSelectedAnswers((prev) => ({
+      ...prev,
+      [questionId]: optionIdx,
+    }));
+  };
+
+  // 3. Submit Phase Handler
+  const handleSubmitPhase = async (phaseNum: number) => {
+    const currentPhaseData =
+      phaseNum === 1
+        ? quizSession?.phase1
+        : phaseNum === 2
+        ? quizSession?.phase2
+        : quizSession?.phase3;
+
+    if (!currentPhaseData) return;
+
+    // Ensure all questions have an answer selected
+    const unanswered = currentPhaseData.questions.filter(
+      (q) => selectedAnswers[q.id] === undefined
+    );
+
+    if (unanswered.length > 0) {
+      setError(`Please answer all ${currentPhaseData.questions.length} questions before submitting.`);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const result = await apiRequest<SubmitResult>(
+        `/api/v1/learn/${sessionId}/quiz/${phaseNum}/submit`,
+        {
+          method: "POST",
+          body: JSON.stringify({ answers: selectedAnswers }),
+        }
+      );
+
+      setPhaseResults((prev) => ({
+        ...prev,
+        [phaseNum]: result,
+      }));
+
+      // Re-fetch quiz session to update unlocked status across phases
+      await fetchQuizData();
+
+      if (result.passed && result.next_phase_unlocked) {
+        setActivePhase(result.next_phase_unlocked);
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Failed to grade submission.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="bg-surface border border-border-muted rounded-2xl p-12 text-center space-y-4 shadow-2xs">
+        <div className="border-4 border-primary border-t-transparent animate-spin w-10 h-10 rounded-full mx-auto" />
+        <p className="font-sans text-sm text-ink/75">Loading adaptive quiz questions...</p>
+      </div>
+    );
+  }
+
+  if (error && !quizSession) {
+    return (
+      <div className="bg-surface border border-red-200 rounded-2xl p-8 text-center space-y-4 shadow-sm">
+        <h3 className="font-display text-lg font-bold text-red-700">Couldn't load quiz</h3>
+        <p className="font-sans text-sm text-ink/75">{error}</p>
+        <button
+          onClick={fetchQuizData}
+          className="px-6 py-2 bg-primary text-surface font-sans font-bold text-sm rounded-xl"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (!quizSession) return null;
+
+  const currentPhaseInfo =
+    activePhase === 1
+      ? quizSession.phase1
+      : activePhase === 2
+      ? quizSession.phase2
+      : quizSession.phase3;
+
+  const isCompleted = quizSession.is_completed;
+  const currentResult = phaseResults[activePhase];
+
+  return (
+    <div className="space-y-6 w-full animate-in fade-in duration-200">
+      {/* Header */}
+      <div className="bg-surface border border-border-muted rounded-2xl p-6 shadow-2xs flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-1">
+          <span className="text-xs font-mono font-bold text-primary uppercase">Adaptive Assessment</span>
+          <h2 className="font-display text-xl font-bold text-ink">{quizSession.video_title}</h2>
+        </div>
+
+        <button
+          onClick={onBackToExplanation}
+          className="text-xs font-sans font-bold text-primary hover:underline flex items-center gap-1.5 cursor-pointer"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span>Back to Story Explanation</span>
+        </button>
+      </div>
+
+      {/* Celebratory Completion Banner if Topic Mastered */}
+      {isCompleted && (
+        <div className="bg-primary/10 border border-primary/30 rounded-2xl p-6 text-center space-y-3 shadow-xs">
+          <div className="w-12 h-12 bg-primary text-surface rounded-full flex items-center justify-center mx-auto text-xl">
+            ✓
+          </div>
+          <h3 className="font-display text-xl font-bold text-primary">Topic Mastered!</h3>
+          <p className="font-sans text-sm text-ink/80 max-w-md mx-auto">
+            You've successfully passed all 3 phases (Recall, Application, and Synthesis) for this topic.
+          </p>
+        </div>
+      )}
+
+      {/* 3-Phase Tab Navigation Bar */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        {[
+          { num: 1, name: "Phase 1: Recall", data: quizSession.phase1, unlocked: true },
+          { num: 2, name: "Phase 2: Application", data: quizSession.phase2, unlocked: !!quizSession.phase2 },
+          { num: 3, name: "Phase 3: Synthesis", data: quizSession.phase3, unlocked: !!quizSession.phase3 },
+        ].map((tab) => {
+          const isPassed = tab.data?.is_passed;
+          const isActive = activePhase === tab.num;
+
+          return (
+            <button
+              key={tab.num}
+              disabled={!tab.unlocked}
+              onClick={() => setActivePhase(tab.num)}
+              className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[90px] ${
+                isActive
+                  ? "bg-surface border-primary ring-2 ring-primary/20 shadow-xs"
+                  : tab.unlocked
+                  ? "bg-surface border-border-muted hover:border-border-muted/80 opacity-80"
+                  : "bg-background border-border-muted/40 opacity-40 cursor-not-allowed"
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="font-mono text-xs font-bold text-ink/60">PHASE {tab.num}</span>
+                {isPassed ? (
+                  <span className="w-5 h-5 bg-primary text-surface rounded-full flex items-center justify-center text-xs font-bold">
+                    ✓
+                  </span>
+                ) : !tab.unlocked ? (
+                  <svg className="w-4 h-4 text-ink/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                ) : null}
+              </div>
+
+              <div>
+                <h4 className="font-display text-xs sm:text-sm font-bold text-ink truncate">{tab.name}</h4>
+                <p className="font-sans text-[11px] text-ink/60 truncate">
+                  {tab.unlocked ? (isPassed ? "Passed" : "Available") : "Locked"}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Phase Locked Error State */}
+      {!currentPhaseInfo ? (
+        <div className="bg-surface border border-border-muted rounded-2xl p-10 text-center space-y-3 shadow-2xs">
+          <div className="w-10 h-10 bg-background border border-border-muted rounded-full flex items-center justify-center mx-auto text-ink/40">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h3 className="font-display text-base font-bold text-ink">Phase {activePhase} is Locked</h3>
+          <p className="font-sans text-xs text-ink/70 max-w-xs mx-auto">
+            You must pass Phase {activePhase - 1} with at least 70% to unlock this phase.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Phase Header Card */}
+          <div className="bg-surface border border-border-muted rounded-2xl p-6 shadow-2xs space-y-1">
+            <h3 className="font-display text-lg font-bold text-primary">
+              Phase {activePhase}: {currentPhaseInfo.name}
+            </h3>
+            <p className="font-sans text-xs text-ink/75 leading-relaxed">
+              {currentPhaseInfo.description} (Requires 70% to pass)
+            </p>
+          </div>
+
+          {/* Submit Result Banner if graded */}
+          {currentResult && (
+            <div
+              className={`border rounded-2xl p-5 space-y-2 shadow-2xs ${
+                currentResult.passed
+                  ? "bg-primary/10 border-primary/30"
+                  : "bg-red-50 border-red-200"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`font-display text-sm font-bold ${currentResult.passed ? "text-primary" : "text-red-700"}`}>
+                  {currentResult.passed ? "Phase Passed!" : "Phase Not Passed"}
+                </span>
+                <span className="font-mono text-sm font-bold text-ink">
+                  {currentResult.score_percent}% ({currentResult.correct_count}/{currentResult.total_questions} correct)
+                </span>
+              </div>
+              <p className="font-sans text-xs text-ink/75">
+                {currentResult.passed
+                  ? currentResult.next_phase_unlocked
+                    ? `Great job! Phase ${currentResult.next_phase_unlocked} is now unlocked.`
+                    : "Congratulations! You have completed all 3 quiz phases."
+                  : "Review the question explanations below and try again to unlock the next phase."}
+              </p>
+            </div>
+          )}
+
+          {/* Error Banner */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-xs font-sans text-red-700">
+              {error}
+            </div>
+          )}
+
+          {/* Questions List */}
+          <div className="space-y-5">
+            {currentPhaseInfo.questions.map((q, qIdx) => {
+              const selectedIdx = selectedAnswers[q.id];
+              const detail = currentResult?.details.find((d) => d.question_id === q.id);
+
+              return (
+                <div
+                  key={q.id}
+                  className="bg-surface border border-border-muted rounded-2xl p-6 shadow-2xs space-y-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <h4 className="font-display text-sm font-bold text-ink leading-snug">
+                      <span className="text-primary font-mono mr-1.5">{qIdx + 1}.</span>
+                      {q.question}
+                    </h4>
+                    {detail && (
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold shrink-0 ${
+                          detail.is_correct
+                            ? "bg-primary/10 text-primary border border-primary/20"
+                            : "bg-red-100 text-red-700 border border-red-200"
+                        }`}
+                      >
+                        {detail.is_correct ? "Correct" : "Incorrect"}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 4 Radio Option Cards */}
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {q.options.map((opt, optIdx) => {
+                      const isSelected = selectedIdx === optIdx;
+                      let optionStyle = "border-border-muted hover:border-border-muted/80 bg-background";
+
+                      if (detail) {
+                        if (optIdx === detail.correct_index) {
+                          optionStyle = "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary/30";
+                        } else if (isSelected && !detail.is_correct) {
+                          optionStyle = "border-red-300 bg-red-50 text-red-700";
+                        }
+                      } else if (isSelected) {
+                        optionStyle = "border-primary bg-primary/5 ring-1 ring-primary/20";
+                      }
+
+                      return (
+                        <button
+                          key={optIdx}
+                          type="button"
+                          onClick={() => handleSelectOption(q.id, optIdx)}
+                          className={`p-3.5 rounded-xl border text-left text-xs font-sans transition-all flex items-start gap-3 cursor-pointer ${optionStyle}`}
+                        >
+                          <span
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center font-mono text-[10px] font-bold shrink-0 mt-0.5 ${
+                              isSelected
+                                ? "bg-primary text-surface border-primary"
+                                : "border-border-muted text-ink/60"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + optIdx)}
+                          </span>
+                          <span className="flex-1 text-ink/90 leading-relaxed">{opt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Detailed Explanation feedback after submission */}
+                  {detail && detail.explanation && (
+                    <div className="bg-background border border-border-muted/60 rounded-xl p-3.5 text-xs font-sans space-y-1">
+                      <span className="font-mono text-[11px] font-bold text-primary uppercase">Explanation:</span>
+                      <p className="text-ink/80 leading-relaxed">{detail.explanation}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end pt-2">
+            <button
+              disabled={isSubmitting}
+              onClick={() => handleSubmitPhase(activePhase)}
+              className="px-8 py-3 bg-primary hover:bg-[#1F3E23] text-surface font-sans font-bold text-sm rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? "Grading..." : `Submit Phase ${activePhase} Answers`}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

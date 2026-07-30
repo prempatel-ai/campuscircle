@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { AnonAvatar } from "@/components/AnonAvatar";
 
@@ -12,6 +12,7 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -64,15 +65,43 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       {/* Shared Persistent Top Header */}
       <header className="bg-surface border-b border-border-muted px-4 py-3 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-2 sm:px-4">
-          {/* Logo / Wordmark */}
-          <Link
-            href="/feed"
-            className="flex items-center gap-2 hover:opacity-90 transition-opacity shrink-0"
-          >
-            <span className="font-display text-2xl font-bold tracking-tight text-primary">
-              CampusCircle
-            </span>
-          </Link>
+          {/* Logo & Main Nav */}
+          <div className="flex items-center gap-6">
+            <Link
+              href="/feed"
+              className="flex items-center gap-2 hover:opacity-90 transition-opacity shrink-0"
+            >
+              <span className="font-display text-2xl font-bold tracking-tight text-primary">
+                CampusCircle
+              </span>
+            </Link>
+
+            <nav className="hidden md:flex items-center gap-1">
+              <Link
+                href="/feed"
+                className={`px-3 py-1.5 rounded-lg text-xs font-sans font-bold transition-all ${
+                  pathname.startsWith("/feed")
+                    ? "bg-primary/10 text-primary"
+                    : "text-ink/60 hover:text-ink hover:bg-background"
+                }`}
+              >
+                Feed
+              </Link>
+              <Link
+                href="/learn"
+                className={`px-3 py-1.5 rounded-lg text-xs font-sans font-bold transition-all flex items-center gap-1.5 ${
+                  pathname.startsWith("/learn")
+                    ? "bg-primary/10 text-primary"
+                    : "text-ink/60 hover:text-ink hover:bg-background"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <span>Learn</span>
+              </Link>
+            </nav>
+          </div>
 
           {/* Global Search Bar */}
           <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md mx-4 hidden sm:block">
