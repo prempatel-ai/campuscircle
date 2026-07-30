@@ -189,14 +189,61 @@ async def fetch_transcript_ytdlp(video_id: str) -> List[dict]:
         return segments
 
 
+
+async def fetch_transcript_supadata(video_id: str) -> List[dict]:
+    """
+    Use Supadata.ai third-party transcript API (free 100 req/month).
+    Supadata has its own proxy infrastructure with clean residential IPs,
+    so it bypasses YouTube cloud IP blocks that affect Render/Railway/etc.
+    """
+    if not settings.supadata_api_key:
+        raise Exception("SUPADATA_API_KEY not configured")
+
+    url = f"https://api.supadata.ai/v1/youtube/transcript?url=https://www.youtube.com/watch?v={video_id}&text=false"
+    headers = {"x-api-key": settings.supadata_api_key}
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.get(url, headers=headers)
+        if res.status_code != 200:
+            raise Exception(f"Supadata API returned {res.status_code}: {res.text[:200]}")
+
+        data = res.json()
+
+        # Supadata returns { "content": [...] } where each item has "text", "offset", "duration"
+        content = data.get("content", [])
+        if not content:
+            raise Exception("Supadata returned empty transcript")
+
+        segments = []
+        for item in content:
+            text_val = str(item.get("text", "")).replace("\n", " ").strip()
+            if text_val:
+                segments.append({
+                    "text": text_val,
+                    "start": float(item.get("offset", 0)) / 1000.0,
+                    "duration": float(item.get("duration", 0)) / 1000.0,
+                })
+
+        if not segments:
+            raise Exception("Supadata transcript has no text segments")
+
+        return segments
+
+
 async def get_transcript_with_fallback(video_id: str) -> List[dict]:
-    # 1. yt-dlp — gold standard for cloud IP environments
+    # 1. Supadata API — third-party proxy with clean IPs (most reliable on cloud hosting)
+    try:
+        return await fetch_transcript_supadata(video_id)
+    except Exception:
+        pass
+
+    # 2. yt-dlp — battle-hardened anti-bot extractor
     try:
         return await fetch_transcript_ytdlp(video_id)
     except Exception:
         pass
 
-    # 2. youtube-transcript-api — lightweight fallback
+    # 3. youtube-transcript-api — lightweight library fallback
     try:
         try:
             return YouTubeTranscriptApi.get_transcript(video_id, languages=["en", "en-US", "en-GB"])
