@@ -1,6 +1,8 @@
+import html
 import json
 import re
 import uuid
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -62,6 +64,86 @@ async def fetch_video_title(video_id: str) -> str | None:
     except Exception:
         pass
     return None
+
+
+async def fetch_transcript_fallback(video_id: str) -> List[dict]:
+    """
+    Direct fallback transcript extractor using custom User-Agent and YouTube timedtext API.
+    Bypasses cloud IP bot detection flags by parsing player response captionTracks directly.
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+    }
+    url = f"https://www.youtube.com/watch?v={video_id}"
+
+    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        res = await client.get(url, headers=headers)
+        if res.status_code != 200:
+            raise Exception(f"Failed to fetch video page ({res.status_code})")
+
+        html_content = res.text
+
+        match = re.search(r'ytInitialPlayerResponse\s*=\s*({.*?});', html_content)
+        if not match:
+            match_url = re.search(r'"captionTracks":\s*\[\s*{"baseUrl":\s*"(.*?)"', html_content)
+            if match_url:
+                caption_url = match_url.group(1).replace(r"\u0026", "&")
+            else:
+                raise Exception("No caption tracks embedded in video page")
+        else:
+            try:
+                player_data = json.loads(match.group(1))
+                captions = player_data.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
+                if not captions:
+                    raise Exception("No caption tracks found for video")
+
+                en_track = next((c for c in captions if "en" in c.get("languageCode", "")), captions[0])
+                caption_url = en_track["baseUrl"]
+            except Exception:
+                raise Exception("Could not parse player captions response")
+
+        sub_res = await client.get(caption_url, headers=headers)
+        if sub_res.status_code != 200:
+            raise Exception("Failed to fetch caption track XML")
+
+        root = ET.fromstring(sub_res.text)
+        segments = []
+        for elem in root.findall("text"):
+            text_val = html.unescape(elem.text or "").replace("\n", " ").strip()
+            if text_val:
+                segments.append({
+                    "text": text_val,
+                    "start": float(elem.attrib.get("start", 0)),
+                    "duration": float(elem.attrib.get("dur", 0))
+                })
+
+        if not segments:
+            raise Exception("Empty transcript XML")
+
+        return segments
+
+
+async def get_transcript_with_fallback(video_id: str) -> List[dict]:
+    # 1. Try youtube-transcript-api first
+    try:
+        try:
+            return YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'en-GB'])
+        except Exception:
+            return YouTubeTranscriptApi.get_transcript(video_id)
+    except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable) as e:
+        raise e
+    except Exception:
+        pass
+
+    # 2. Try direct timedtext fallback
+    try:
+        return await fetch_transcript_fallback(video_id)
+    except Exception as fallback_err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not retrieve transcript: {str(fallback_err)}. Ensure closed captions (CC) are enabled for this video."
+        )
 
 
 def parse_and_validate_chunks(content_str: str) -> List[dict] | None:
@@ -397,10 +479,7 @@ async def extract_youtube_transcript(
         )
 
     try:
-        try:
-            raw_transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'en-GB'])
-        except Exception:
-            raw_transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        raw_transcript = await get_transcript_with_fallback(video_id)
     except TranscriptsDisabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -415,17 +494,6 @@ async def extract_youtube_transcript(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The specified YouTube video is unavailable or private."
-        )
-    except Exception as e:
-        err_msg = str(e)
-        if "Too Many Requests" in err_msg or "google.com/sorry" in err_msg or "429" in err_msg:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="YouTube rate limit / bot protection was triggered on the cloud server IP. Please try another video or paste the transcript text directly."
-            )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to extract transcript: {err_msg}"
         )
 
     segments = [
@@ -519,10 +587,7 @@ async def explain_youtube_transcript(
 
     if not transcript_text:
         try:
-            try:
-                raw_transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'en-GB'])
-            except Exception:
-                raw_transcript = YouTubeTranscriptApi.get_transcript(video_id)
+            raw_transcript = await get_transcript_with_fallback(video_id)
             transcript_text = " ".join([item.get("text", "").replace("\n", " ").strip() for item in raw_transcript])
         except TranscriptsDisabled:
             raise HTTPException(status_code=400, detail="Captions/transcripts are disabled for this video.")
@@ -530,14 +595,6 @@ async def explain_youtube_transcript(
             raise HTTPException(status_code=404, detail="No transcript available for this video.")
         except VideoUnavailable:
             raise HTTPException(status_code=404, detail="The specified video is unavailable.")
-        except Exception as e:
-            err_msg = str(e)
-            if "Too Many Requests" in err_msg or "google.com/sorry" in err_msg or "429" in err_msg:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="YouTube rate limit / bot protection was triggered on the cloud server IP. Please try another video or paste the transcript text directly."
-                )
-            raise HTTPException(status_code=400, detail=f"Failed to fetch transcript: {err_msg}")
 
     chunks_data = await call_groq_api_for_explanation(transcript_text)
 
@@ -603,7 +660,6 @@ async def get_or_create_quiz(
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Learning session not found.")
 
-    # Generate quiz if not yet generated for this session
     if not session.quiz_data:
         explanation_text = " ".join([c["explanation"] for c in session.explanation_chunks.get("chunks", [])])
         quiz_json = await call_groq_api_for_quiz(session.video_title, explanation_text or session.transcript)
@@ -711,7 +767,6 @@ async def submit_quiz_phase(
         "is_completed": False
     }
 
-    # Gating checks
     if phase == 2 and not progress.get("phase1_passed"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phase 1 must be passed before attempting Phase 2.")
     if phase == 3 and not progress.get("phase2_passed"):
@@ -727,7 +782,6 @@ async def submit_quiz_phase(
     total_questions = len(phase_questions)
     details: List[QuestionResultDetail] = []
 
-    # Pure Python server-side grading (0 AI calls)
     for q in phase_questions:
         q_id = q["id"]
         correct_idx = q["correct_index"]
@@ -750,7 +804,6 @@ async def submit_quiz_phase(
     score_percent = round((correct_count / total_questions) * 100.0, 1)
     passed = (score_percent >= 70.0)
 
-    # Update progress if passed
     next_unlocked = None
     if passed:
         if phase == 1:
