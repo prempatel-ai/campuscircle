@@ -616,6 +616,79 @@ async def get_saved_posts(
     return enriched, total_count
 
 
+async def get_commented_posts(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    page: int = 1,
+    size: int = 20
+) -> Tuple[List[EnrichedPost], int]:
+    """
+    Retrieve paginated list of active posts where the user has commented.
+    """
+    from sqlalchemy import or_, distinct
+    from src.models.comment import Comment
+
+    if page < 1:
+        page = 1
+    if size < 1:
+        size = 20
+
+    comment_count_col = _comment_count_subquery(Post.id)
+    thread_total_col = _thread_total_parts_subquery(Post.thread_id)
+
+    commented_post_ids_subq = (
+        select(Comment.post_id)
+        .where(Comment.author_id == user_id)
+        .distinct()
+        .subquery()
+    )
+
+    base_query = (
+        select(
+            Post,
+            User.username.label("author_username"),
+            comment_count_col.label("comment_count"),
+            func.coalesce(thread_total_col, 1).label("thread_total_parts")
+        )
+        .join(commented_post_ids_subq, Post.id == commented_post_ids_subq.c.post_id)
+        .join(User, User.id == Post.author_id)
+        .where(
+            Post.is_deleted == False,
+            or_(Post.thread_position == 1, Post.thread_position.is_(None))
+        )
+        .order_by(Post.created_at.desc())
+    )
+
+    count_stmt = (
+        select(func.count(distinct(Post.id)))
+        .join(commented_post_ids_subq, Post.id == commented_post_ids_subq.c.post_id)
+        .where(
+            Post.is_deleted == False,
+            or_(Post.thread_position == 1, Post.thread_position.is_(None))
+        )
+    )
+    count_res = await db.execute(count_stmt)
+    total_count = count_res.scalar_one() or 0
+
+    offset = (page - 1) * size
+    paginated_query = base_query.offset(offset).limit(size)
+    result = await db.execute(paginated_query)
+
+    enriched_list = []
+    for row in result.all():
+        post_obj, author_username, comment_count, thread_total_parts = row
+        enriched_list.append(
+            EnrichedPost(
+                post=post_obj,
+                author_username=author_username,
+                comment_count=comment_count,
+                thread_total_parts=thread_total_parts
+            )
+        )
+
+    return enriched_list, total_count
+
+
 async def get_for_you_feed(
     db: AsyncSession,
     user_id: uuid.UUID,
