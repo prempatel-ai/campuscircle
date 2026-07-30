@@ -354,27 +354,48 @@ async def call_groq_api_for_explanation(transcript_text: str) -> List[dict]:
 _MOCK_QUIZ = {
     "phases": {
         "phase1": {
-            "name": "Recall", "description": "Test basic memory of core terms.",
+            "name": "Recall", "description": "Test basic memory of core terms and definitions.",
             "questions": [
                 {"id": "p1_q1", "question": "What is the primary subject of this topic?", "options": ["Foundational concepts", "Historical background", "Unverified theories", "Admin guidelines"], "correct_index": 0, "explanation": "The material focuses on foundational concepts."},
                 {"id": "p1_q2", "question": "Why are building blocks introduced early?", "options": ["To confuse learners", "To build a mental framework", "To meet length requirements", "To skip real examples"], "correct_index": 1, "explanation": "They provide a framework for applying concepts later."},
                 {"id": "p1_q3", "question": "How should key terms be approached?", "options": ["Memorize without context", "Ignore definitions", "Connect to real scenarios", "Rely on luck"], "correct_index": 2, "explanation": "Connecting terms to examples solidifies understanding."},
+                {"id": "p1_q4", "question": "What role do definitions play in learning?", "options": ["They slow progress", "They anchor understanding", "They are optional", "They complicate things"], "correct_index": 1, "explanation": "Definitions anchor understanding for advanced concepts."},
+                {"id": "p1_q5", "question": "Which learning approach is most effective?", "options": ["Passive reading only", "Active recall and practice", "Skipping fundamentals", "Relying on memorization"], "correct_index": 1, "explanation": "Active recall strengthens retention and understanding."},
+                {"id": "p1_q6", "question": "What is a prerequisite before advanced study?", "options": ["Mastering terminology", "Speed reading", "Ignoring basics", "Random exploration"], "correct_index": 0, "explanation": "Mastering terminology is essential before tackling advanced material."},
+                {"id": "p1_q7", "question": "How does structured learning differ from unstructured?", "options": ["It follows a logical sequence", "It is always faster", "It skips fundamentals", "It requires no effort"], "correct_index": 0, "explanation": "Structured learning builds concepts in a logical, progressive sequence."},
+                {"id": "p1_q8", "question": "What is the purpose of examples in explanations?", "options": ["To fill space", "To ground abstract ideas in reality", "To confuse learners", "To replace definitions"], "correct_index": 1, "explanation": "Examples ground abstract ideas in reality for better understanding."},
+                {"id": "p1_q9", "question": "Why is context important when learning terms?", "options": ["Context is irrelevant", "It helps retention and application", "It makes things harder", "It delays progress"], "correct_index": 1, "explanation": "Context helps retention and practical application of terms."},
+                {"id": "p1_q10", "question": "What distinguishes a core concept from a detail?", "options": ["Core concepts are foundational and recurring", "Details are more important", "There is no difference", "Core concepts are always simpler"], "correct_index": 0, "explanation": "Core concepts are foundational principles that recur throughout the topic."},
             ],
         },
         "phase2": {
-            "name": "Application", "description": "Apply concepts to real-world scenarios.",
+            "name": "Application", "description": "Apply concepts to real-world scenarios and problems.",
             "questions": [
                 {"id": "p2_q1", "question": "First step when hitting a bottleneck?", "options": ["Abandon", "Trace execution path", "Change random settings", "Blame dependencies"], "correct_index": 1, "explanation": "Tracing pinpoints the exact cause."},
                 {"id": "p2_q2", "question": "How does scenario framing help?", "options": ["Isolates variables", "Adds complexity", "Hides flaws", "Removes testing"], "correct_index": 0, "explanation": "It isolates variables and predicts outcomes."},
                 {"id": "p2_q3", "question": "Common implementation trade-off?", "options": ["Simplicity vs Scalability", "Color vs Font", "Users vs Location", "None"], "correct_index": 0, "explanation": "Engineers balance simplicity against scaling demands."},
+                {"id": "p2_q4", "question": "When should you optimize prematurely?", "options": ["Never, measure first", "Always, at the start", "Only on weekends", "When the code looks slow"], "correct_index": 0, "explanation": "Premature optimization wastes effort; always measure first."},
+                {"id": "p2_q5", "question": "How do you validate a proposed solution?", "options": ["Test against edge cases", "Trust intuition alone", "Skip testing", "Ask random people"], "correct_index": 0, "explanation": "Testing against edge cases validates solution correctness."},
+                {"id": "p2_q6", "question": "What makes debugging systematic?", "options": ["Reproducing, isolating, then fixing", "Randomly changing code", "Restarting the server", "Ignoring error logs"], "correct_index": 0, "explanation": "Systematic debugging follows reproduce, isolate, fix methodology."},
+                {"id": "p2_q7", "question": "When is abstraction beneficial?", "options": ["When it hides unnecessary complexity", "Always, without exception", "Never", "Only in documentation"], "correct_index": 0, "explanation": "Abstraction is beneficial when it simplifies by hiding irrelevant complexity."},
+                {"id": "p2_q8", "question": "How should you handle conflicting requirements?", "options": ["Prioritize by impact and feasibility", "Implement all at once", "Ignore some", "Choose randomly"], "correct_index": 0, "explanation": "Prioritizing by impact and feasibility resolves conflicting requirements."},
+                {"id": "p2_q9", "question": "What indicates a well-designed component?", "options": ["Single responsibility and clear interfaces", "Maximum features", "Complex internals", "Tight coupling"], "correct_index": 0, "explanation": "Good components have a single responsibility and clear interfaces."},
+                {"id": "p2_q10", "question": "Why is iterative development preferred?", "options": ["Enables early feedback and course correction", "It is slower", "It avoids planning", "It requires no testing"], "correct_index": 0, "explanation": "Iterative development enables early feedback loops and timely correction."},
             ],
         },
         "phase3": {
-            "name": "Synthesis", "description": "Synthesise & evaluate complex systems.",
+            "name": "Synthesis", "description": "Synthesise and evaluate complex systems and trade-offs.",
             "questions": [
                 {"id": "p3_q1", "question": "How do principles ensure reliability?", "options": ["Modular boundaries + verification", "Manual inspection", "Ignoring edge cases", "Hardcoding parameters"], "correct_index": 0, "explanation": "Modular design and verification ensure resilience."},
-                {"id": "p3_q2", "question": "Ultimate mastery goal?", "options": ["Pass one test", "Design & adapt solutions", "Copy templates", "Avoid discussions"], "correct_index": 1, "explanation": "Mastery means synthesising knowledge to solve novel problems."},
-                {"id": "p3_q3", "question": "Paramount architectural criterion?", "options": ["Social media popularity", "Domain fit & maintainability", "Fewest code lines", "Arbitrary preference"], "correct_index": 1, "explanation": "Maintainability and domain alignment drive the best choice."},
+                {"id": "p3_q2", "question": "Ultimate mastery goal?", "options": ["Pass one test", "Design and adapt solutions", "Copy templates", "Avoid discussions"], "correct_index": 1, "explanation": "Mastery means synthesising knowledge to solve novel problems."},
+                {"id": "p3_q3", "question": "Paramount architectural criterion?", "options": ["Social media popularity", "Domain fit and maintainability", "Fewest code lines", "Arbitrary preference"], "correct_index": 1, "explanation": "Maintainability and domain alignment drive the best choice."},
+                {"id": "p3_q4", "question": "How do you evaluate competing approaches?", "options": ["Compare trade-offs against constraints", "Pick the newest one", "Choose the simplest always", "Flip a coin"], "correct_index": 0, "explanation": "Evaluating trade-offs against domain constraints yields the best approach."},
+                {"id": "p3_q5", "question": "What makes knowledge transfer effective?", "options": ["Clear documentation and shared mental models", "Verbal instructions only", "No documentation needed", "Copy-pasting code"], "correct_index": 0, "explanation": "Clear documentation and shared mental models enable effective knowledge transfer."},
+                {"id": "p3_q6", "question": "When should you break a system into microservices?", "options": ["When independent scaling and deployment are needed", "Always, for every project", "Never", "When the team is small"], "correct_index": 0, "explanation": "Microservices are justified when components need independent scaling."},
+                {"id": "p3_q7", "question": "How does feedback loop quality affect outcomes?", "options": ["Faster, more accurate loops lead to better outcomes", "Loops are unnecessary", "Slower loops are better", "Feedback is only for managers"], "correct_index": 0, "explanation": "Faster and more accurate feedback loops consistently produce better outcomes."},
+                {"id": "p3_q8", "question": "What is the risk of over-engineering?", "options": ["Wasted effort on unused abstractions", "Better code quality", "No risk at all", "Faster delivery"], "correct_index": 0, "explanation": "Over-engineering wastes effort on abstractions that may never be needed."},
+                {"id": "p3_q9", "question": "How do you measure learning effectiveness?", "options": ["Ability to apply concepts to novel problems", "Pages read", "Time spent studying", "Number of certificates"], "correct_index": 0, "explanation": "True effectiveness is measured by applying concepts to novel, unseen problems."},
+                {"id": "p3_q10", "question": "What integrates all phases of understanding?", "options": ["Connecting recall, application, and critical evaluation", "Memorization alone", "Skipping fundamentals", "Avoiding challenges"], "correct_index": 0, "explanation": "Full understanding connects recall, practical application, and critical evaluation."},
             ],
         },
     }
@@ -388,8 +409,9 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str) -> dic
     system_prompt = (
         "You are an expert AI assessment designer. Create a 3-phase multiple-choice quiz. "
         "Return JSON with top-level key 'phases' containing 'phase1', 'phase2', 'phase3'. "
-        "Each phase has 'name', 'description', and 'questions' (list of 3). "
-        "Each question: 'id' (e.g. p1_q1), 'question', 'options' (4 strings), 'correct_index' (0-3 int), 'explanation'."
+        "Each phase has 'name', 'description', and 'questions' (list of exactly 10 questions). "
+        "Each question: 'id' (e.g. p1_q1 through p1_q10), 'question', 'options' (4 strings), 'correct_index' (0-3 int), 'explanation'. "
+        "Generate thoughtful, varied questions that test real comprehension — not trivial or repetitive."
     )
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
