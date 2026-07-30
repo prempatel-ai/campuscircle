@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -46,6 +47,8 @@ class QuizQuestionOut(BaseModel):
     id: str
     question: str
     options: List[str]
+    chunk_id: Optional[str] = Field(None, description="Explanation chunk reference ID or title")
+    concept_category: Optional[str] = Field(None, description="Broad concept category tag e.g. Recursion, System Design")
 
 
 class QuizPhaseOut(BaseModel):
@@ -78,6 +81,9 @@ class QuestionResultDetail(BaseModel):
     correct_index: int
     is_correct: bool
     explanation: str
+    chunk_id: Optional[str] = None
+    concept_title: Optional[str] = None
+    concept_category: Optional[str] = None
 
 
 class QuizSubmitResponse(BaseModel):
@@ -90,3 +96,28 @@ class QuizSubmitResponse(BaseModel):
     next_phase_unlocked: Optional[int] = None
     is_session_completed: bool
     details: List[QuestionResultDetail]
+    failed_chunk_ids: List[str] = Field(default_factory=list, description="Chunk/concept IDs needing remediation")
+
+
+class RemediateRequest(BaseModel):
+    chunk_id: str = Field(..., description="ID or title of the explanation chunk to remediate")
+
+
+class RemediateResponse(BaseModel):
+    session_id: str
+    chunk_id: str
+    concept_title: str
+    re_explanation: str
+    analogy: Optional[str] = None
+    is_cached: bool
+
+
+class UserConceptGapOut(BaseModel):
+    concept_category: str
+    miss_count: int
+    last_seen_at: datetime
+
+
+class UserGapsResponse(BaseModel):
+    total_gaps_count: int
+    gaps: List[UserConceptGapOut]

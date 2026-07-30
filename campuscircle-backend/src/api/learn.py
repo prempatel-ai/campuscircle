@@ -7,7 +7,8 @@ import tempfile
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,7 @@ from src.database import get_db
 from src.auth.dependencies import get_current_user
 from src.models.learn import LearnExtractionLog
 from src.models.learning_session import LearningSession
+from src.models.user_concept_gap import UserConceptGap
 from src.schemas.learn import (
     ExtractRequest,
     ExtractResponse,
@@ -37,7 +39,11 @@ from src.schemas.learn import (
     QuizSessionOut,
     QuizSubmitRequest,
     QuestionResultDetail,
-    QuizSubmitResponse
+    QuizSubmitResponse,
+    RemediateRequest,
+    RemediateResponse,
+    UserConceptGapOut,
+    UserGapsResponse
 )
 
 router = APIRouter(prefix="/learn", tags=["learn"])
@@ -70,11 +76,6 @@ async def fetch_video_title(video_id: str) -> str | None:
 
 
 def _ydl_extract_sync(video_id: str, tmpdir: str) -> None:
-    """
-    Blocking yt-dlp call — runs in a thread via run_in_executor.
-    yt-dlp constantly updates its anti-bot fingerprinting, making it the
-    most reliable extractor on cloud IPs where plain HTTP gets 429'd.
-    """
     import yt_dlp  # type: ignore
 
     ydl_opts = {
@@ -147,8 +148,40 @@ def _parse_vtt(raw: str) -> List[dict]:
     return segments
 
 
+async def fetch_transcript_supadata(video_id: str) -> List[dict]:
+    if not settings.supadata_api_key:
+        raise Exception("SUPADATA_API_KEY not configured")
+
+    url = f"https://api.supadata.ai/v1/youtube/transcript?url=https://www.youtube.com/watch?v={video_id}&text=false"
+    headers = {"x-api-key": settings.supadata_api_key}
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.get(url, headers=headers)
+        if res.status_code != 200:
+            raise Exception(f"Supadata API returned {res.status_code}")
+
+        data = res.json()
+        content = data.get("content", [])
+        if not content:
+            raise Exception("Supadata returned empty transcript")
+
+        segments = []
+        for item in content:
+            text_val = str(item.get("text", "")).replace("\n", " ").strip()
+            if text_val:
+                segments.append({
+                    "text": text_val,
+                    "start": float(item.get("offset", 0)) / 1000.0,
+                    "duration": float(item.get("duration", 0)) / 1000.0,
+                })
+
+        if not segments:
+            raise Exception("Supadata transcript has no text segments")
+
+        return segments
+
+
 async def fetch_transcript_ytdlp(video_id: str) -> List[dict]:
-    """Primary extractor using yt-dlp — handles cloud IP anti-bot blocks."""
     with tempfile.TemporaryDirectory() as tmpdir:
         loop = asyncio.get_event_loop()
         try:
@@ -163,7 +196,7 @@ async def fetch_transcript_ytdlp(video_id: str) -> List[dict]:
                 break
 
         if not sub_file:
-            raise Exception("yt-dlp produced no subtitle file (captions may be disabled)")
+            raise Exception("yt-dlp produced no subtitle file")
 
         with open(sub_file, "r", encoding="utf-8") as f:
             raw = f.read()
@@ -190,61 +223,17 @@ async def fetch_transcript_ytdlp(video_id: str) -> List[dict]:
         return segments
 
 
-
-async def fetch_transcript_supadata(video_id: str) -> List[dict]:
-    """
-    Use Supadata.ai third-party transcript API (free 100 req/month).
-    Supadata has its own proxy infrastructure with clean residential IPs,
-    so it bypasses YouTube cloud IP blocks that affect Render/Railway/etc.
-    """
-    if not settings.supadata_api_key:
-        raise Exception("SUPADATA_API_KEY not configured")
-
-    url = f"https://api.supadata.ai/v1/youtube/transcript?url=https://www.youtube.com/watch?v={video_id}&text=false"
-    headers = {"x-api-key": settings.supadata_api_key}
-
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        res = await client.get(url, headers=headers)
-        if res.status_code != 200:
-            raise Exception(f"Supadata API returned {res.status_code}: {res.text[:200]}")
-
-        data = res.json()
-
-        # Supadata returns { "content": [...] } where each item has "text", "offset", "duration"
-        content = data.get("content", [])
-        if not content:
-            raise Exception("Supadata returned empty transcript")
-
-        segments = []
-        for item in content:
-            text_val = str(item.get("text", "")).replace("\n", " ").strip()
-            if text_val:
-                segments.append({
-                    "text": text_val,
-                    "start": float(item.get("offset", 0)) / 1000.0,
-                    "duration": float(item.get("duration", 0)) / 1000.0,
-                })
-
-        if not segments:
-            raise Exception("Supadata transcript has no text segments")
-
-        return segments
-
-
 async def get_transcript_with_fallback(video_id: str) -> List[dict]:
-    # 1. Supadata API — third-party proxy with clean IPs (most reliable on cloud hosting)
     try:
         return await fetch_transcript_supadata(video_id)
     except Exception:
         pass
 
-    # 2. yt-dlp — battle-hardened anti-bot extractor
     try:
         return await fetch_transcript_ytdlp(video_id)
     except Exception:
         pass
 
-    # 3. youtube-transcript-api — lightweight library fallback
     try:
         try:
             return YouTubeTranscriptApi.get_transcript(video_id, languages=["en", "en-US", "en-GB"])
@@ -259,13 +248,12 @@ async def get_transcript_with_fallback(video_id: str) -> List[dict]:
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=(
             "Could not retrieve transcript automatically. "
-            "The video may have captions disabled or be age-restricted. "
             "Switch to the 'Paste Notes / Text' tab to paste the transcript manually."
         ),
     )
 
 
-# ─── Groq helpers ────────────────────────────────────────────────────────────
+# ─── Groq & Remediation Helpers ─────────────────────────────────────────────
 
 def parse_and_validate_chunks(content_str: str) -> List[dict] | None:
     try:
@@ -313,9 +301,9 @@ def validate_quiz_data_structure(data: dict) -> dict | None:
 
 
 _MOCK_CHUNKS = [
-    {"title": "Introduction to the Topic", "explanation": "Imagine opening a new textbook for the first time. The video lays out foundational principles in clear, simple terms."},
-    {"title": "Real-World Scenario", "explanation": "A practical scenario—think of a chef orchestrating a kitchen during rush hour—demonstrates how each concept works together."},
-    {"title": "Core Takeaway & Application", "explanation": "By understanding these building blocks, you can apply them to solve complex problems independently."},
+    {"title": "Introduction & Fundamentals", "explanation": "Imagine opening a new textbook for the first time. The material lays out foundational principles in clear, simple terms."},
+    {"title": "Real-World Application & Logic", "explanation": "A practical scenario—think of a chef orchestrating a kitchen during rush hour—demonstrates how each concept works together."},
+    {"title": "Core Synthesis & Evaluation", "explanation": "By understanding these building blocks, you can apply them to solve complex problems independently."},
 ]
 
 
@@ -357,46 +345,46 @@ _MOCK_QUIZ = {
         "phase1": {
             "name": "Recall", "description": "Test basic memory of core terms and definitions.",
             "questions": [
-                {"id": "p1_q1", "question": "What is the primary subject of this topic?", "options": ["Foundational concepts", "Historical background", "Unverified theories", "Admin guidelines"], "correct_index": 0, "explanation": "The material focuses on foundational concepts."},
-                {"id": "p1_q2", "question": "Why are building blocks introduced early?", "options": ["To confuse learners", "To build a mental framework", "To meet length requirements", "To skip real examples"], "correct_index": 1, "explanation": "They provide a framework for applying concepts later."},
-                {"id": "p1_q3", "question": "How should key terms be approached?", "options": ["Memorize without context", "Ignore definitions", "Connect to real scenarios", "Rely on luck"], "correct_index": 2, "explanation": "Connecting terms to examples solidifies understanding."},
-                {"id": "p1_q4", "question": "What role do definitions play in learning?", "options": ["They slow progress", "They anchor understanding", "They are optional", "They complicate things"], "correct_index": 1, "explanation": "Definitions anchor understanding for advanced concepts."},
-                {"id": "p1_q5", "question": "Which learning approach is most effective?", "options": ["Passive reading only", "Active recall and practice", "Skipping fundamentals", "Relying on memorization"], "correct_index": 1, "explanation": "Active recall strengthens retention and understanding."},
-                {"id": "p1_q6", "question": "What is a prerequisite before advanced study?", "options": ["Mastering terminology", "Speed reading", "Ignoring basics", "Random exploration"], "correct_index": 0, "explanation": "Mastering terminology is essential before tackling advanced material."},
-                {"id": "p1_q7", "question": "How does structured learning differ from unstructured?", "options": ["It follows a logical sequence", "It is always faster", "It skips fundamentals", "It requires no effort"], "correct_index": 0, "explanation": "Structured learning builds concepts in a logical, progressive sequence."},
-                {"id": "p1_q8", "question": "What is the purpose of examples in explanations?", "options": ["To fill space", "To ground abstract ideas in reality", "To confuse learners", "To replace definitions"], "correct_index": 1, "explanation": "Examples ground abstract ideas in reality for better understanding."},
-                {"id": "p1_q9", "question": "Why is context important when learning terms?", "options": ["Context is irrelevant", "It helps retention and application", "It makes things harder", "It delays progress"], "correct_index": 1, "explanation": "Context helps retention and practical application of terms."},
-                {"id": "p1_q10", "question": "What distinguishes a core concept from a detail?", "options": ["Core concepts are foundational and recurring", "Details are more important", "There is no difference", "Core concepts are always simpler"], "correct_index": 0, "explanation": "Core concepts are foundational principles that recur throughout the topic."},
+                {"id": "p1_q1", "question": "What is the primary subject of this topic?", "options": ["Foundational concepts", "Historical background", "Unverified theories", "Admin guidelines"], "correct_index": 0, "explanation": "The material focuses on foundational concepts.", "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
+                {"id": "p1_q2", "question": "Why are building blocks introduced early?", "options": ["To confuse learners", "To build a mental framework", "To meet length requirements", "To skip real examples"], "correct_index": 1, "explanation": "They provide a framework for applying concepts later.", "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
+                {"id": "p1_q3", "question": "How should key terms be approached?", "options": ["Memorize without context", "Ignore definitions", "Connect to real scenarios", "Rely on luck"], "correct_index": 2, "explanation": "Connecting terms to examples solidifies understanding.", "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
+                {"id": "p1_q4", "question": "What role do definitions play in learning?", "options": ["They slow progress", "They anchor understanding", "They are optional", "They complicate things"], "correct_index": 1, "explanation": "Definitions anchor understanding for advanced concepts.", "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
+                {"id": "p1_q5", "question": "Which learning approach is most effective?", "options": ["Passive reading only", "Active recall and practice", "Skipping fundamentals", "Relying on memorization"], "correct_index": 1, "explanation": "Active recall strengthens retention and understanding.", "chunk_id": "chunk_1", "concept_category": "Application"},
+                {"id": "p1_q6", "question": "What is a prerequisite before advanced study?", "options": ["Mastering terminology", "Speed reading", "Ignoring basics", "Random exploration"], "correct_index": 0, "explanation": "Mastering terminology is essential before tackling advanced material.", "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
+                {"id": "p1_q7", "question": "How does structured learning differ from unstructured?", "options": ["It follows a logical sequence", "It is always faster", "It skips fundamentals", "It requires no effort"], "correct_index": 0, "explanation": "Structured learning builds concepts in a logical, progressive sequence.", "chunk_id": "chunk_1", "concept_category": "Application"},
+                {"id": "p1_q8", "question": "What is the purpose of examples in explanations?", "options": ["To fill space", "To ground abstract ideas in reality", "To confuse learners", "To replace definitions"], "correct_index": 1, "explanation": "Examples ground abstract ideas in reality for better understanding.", "chunk_id": "chunk_1", "concept_category": "Application"},
+                {"id": "p1_q9", "question": "Why is context important when learning terms?", "options": ["Context is irrelevant", "It helps retention and application", "It makes things harder", "It delays progress"], "correct_index": 1, "explanation": "Context helps retention and practical application of terms.", "chunk_id": "chunk_1", "concept_category": "Application"},
+                {"id": "p1_q10", "question": "What distinguishes a core concept from a detail?", "options": ["Core concepts are foundational and recurring", "Details are more important", "There is no difference", "Core concepts are always simpler"], "correct_index": 0, "explanation": "Core concepts are foundational principles that recur throughout the topic.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
             ],
         },
         "phase2": {
             "name": "Application", "description": "Apply concepts to real-world scenarios and problems.",
             "questions": [
-                {"id": "p2_q1", "question": "First step when hitting a bottleneck?", "options": ["Abandon", "Trace execution path", "Change random settings", "Blame dependencies"], "correct_index": 1, "explanation": "Tracing pinpoints the exact cause."},
-                {"id": "p2_q2", "question": "How does scenario framing help?", "options": ["Isolates variables", "Adds complexity", "Hides flaws", "Removes testing"], "correct_index": 0, "explanation": "It isolates variables and predicts outcomes."},
-                {"id": "p2_q3", "question": "Common implementation trade-off?", "options": ["Simplicity vs Scalability", "Color vs Font", "Users vs Location", "None"], "correct_index": 0, "explanation": "Engineers balance simplicity against scaling demands."},
-                {"id": "p2_q4", "question": "When should you optimize prematurely?", "options": ["Never, measure first", "Always, at the start", "Only on weekends", "When the code looks slow"], "correct_index": 0, "explanation": "Premature optimization wastes effort; always measure first."},
-                {"id": "p2_q5", "question": "How do you validate a proposed solution?", "options": ["Test against edge cases", "Trust intuition alone", "Skip testing", "Ask random people"], "correct_index": 0, "explanation": "Testing against edge cases validates solution correctness."},
-                {"id": "p2_q6", "question": "What makes debugging systematic?", "options": ["Reproducing, isolating, then fixing", "Randomly changing code", "Restarting the server", "Ignoring error logs"], "correct_index": 0, "explanation": "Systematic debugging follows reproduce, isolate, fix methodology."},
-                {"id": "p2_q7", "question": "When is abstraction beneficial?", "options": ["When it hides unnecessary complexity", "Always, without exception", "Never", "Only in documentation"], "correct_index": 0, "explanation": "Abstraction is beneficial when it simplifies by hiding irrelevant complexity."},
-                {"id": "p2_q8", "question": "How should you handle conflicting requirements?", "options": ["Prioritize by impact and feasibility", "Implement all at once", "Ignore some", "Choose randomly"], "correct_index": 0, "explanation": "Prioritizing by impact and feasibility resolves conflicting requirements."},
-                {"id": "p2_q9", "question": "What indicates a well-designed component?", "options": ["Single responsibility and clear interfaces", "Maximum features", "Complex internals", "Tight coupling"], "correct_index": 0, "explanation": "Good components have a single responsibility and clear interfaces."},
-                {"id": "p2_q10", "question": "Why is iterative development preferred?", "options": ["Enables early feedback and course correction", "It is slower", "It avoids planning", "It requires no testing"], "correct_index": 0, "explanation": "Iterative development enables early feedback loops and timely correction."},
+                {"id": "p2_q1", "question": "First step when hitting a bottleneck?", "options": ["Abandon", "Trace execution path", "Change random settings", "Blame dependencies"], "correct_index": 1, "explanation": "Tracing pinpoints the exact cause.", "chunk_id": "chunk_1", "concept_category": "Application"},
+                {"id": "p2_q2", "question": "How does scenario framing help?", "options": ["Isolates variables", "Adds complexity", "Hides flaws", "Removes testing"], "correct_index": 0, "explanation": "It isolates variables and predicts outcomes.", "chunk_id": "chunk_1", "concept_category": "Application"},
+                {"id": "p2_q3", "question": "Common implementation trade-off?", "options": ["Simplicity vs Scalability", "Color vs Font", "Users vs Location", "None"], "correct_index": 0, "explanation": "Engineers balance simplicity against scaling demands.", "chunk_id": "chunk_1", "concept_category": "Application"},
+                {"id": "p2_q4", "question": "When should you optimize prematurely?", "options": ["Never, measure first", "Always, at the start", "Only on weekends", "When the code looks slow"], "correct_index": 0, "explanation": "Premature optimization wastes effort; always measure first.", "chunk_id": "chunk_1", "concept_category": "Application"},
+                {"id": "p2_q5", "question": "How do you validate a proposed solution?", "options": ["Test against edge cases", "Trust intuition alone", "Skip testing", "Ask random people"], "correct_index": 0, "explanation": "Testing against edge cases validates solution correctness.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p2_q6", "question": "What makes debugging systematic?", "options": ["Reproducing, isolating, then fixing", "Randomly changing code", "Restarting the server", "Ignoring error logs"], "correct_index": 0, "explanation": "Systematic debugging follows reproduce, isolate, fix methodology.", "chunk_id": "chunk_1", "concept_category": "Application"},
+                {"id": "p2_q7", "question": "When is abstraction beneficial?", "options": ["When it hides unnecessary complexity", "Always, without exception", "Never", "Only in documentation"], "correct_index": 0, "explanation": "Abstraction is beneficial when it simplifies by hiding irrelevant complexity.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p2_q8", "question": "How should you handle conflicting requirements?", "options": ["Prioritize by impact and feasibility", "Implement all at once", "Ignore some", "Choose randomly"], "correct_index": 0, "explanation": "Prioritizing by impact and feasibility resolves conflicting requirements.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p2_q9", "question": "What indicates a well-designed component?", "options": ["Single responsibility and clear interfaces", "Maximum features", "Complex internals", "Tight coupling"], "correct_index": 0, "explanation": "Good components have a single responsibility and clear interfaces.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p2_q10", "question": "Why is iterative development preferred?", "options": ["Enables early feedback and course correction", "It is slower", "It avoids planning", "It requires no testing"], "correct_index": 0, "explanation": "Iterative development enables early feedback loops and timely correction.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
             ],
         },
         "phase3": {
             "name": "Synthesis", "description": "Synthesise and evaluate complex systems and trade-offs.",
             "questions": [
-                {"id": "p3_q1", "question": "How do principles ensure reliability?", "options": ["Modular boundaries + verification", "Manual inspection", "Ignoring edge cases", "Hardcoding parameters"], "correct_index": 0, "explanation": "Modular design and verification ensure resilience."},
-                {"id": "p3_q2", "question": "Ultimate mastery goal?", "options": ["Pass one test", "Design and adapt solutions", "Copy templates", "Avoid discussions"], "correct_index": 1, "explanation": "Mastery means synthesising knowledge to solve novel problems."},
-                {"id": "p3_q3", "question": "Paramount architectural criterion?", "options": ["Social media popularity", "Domain fit and maintainability", "Fewest code lines", "Arbitrary preference"], "correct_index": 1, "explanation": "Maintainability and domain alignment drive the best choice."},
-                {"id": "p3_q4", "question": "How do you evaluate competing approaches?", "options": ["Compare trade-offs against constraints", "Pick the newest one", "Choose the simplest always", "Flip a coin"], "correct_index": 0, "explanation": "Evaluating trade-offs against domain constraints yields the best approach."},
-                {"id": "p3_q5", "question": "What makes knowledge transfer effective?", "options": ["Clear documentation and shared mental models", "Verbal instructions only", "No documentation needed", "Copy-pasting code"], "correct_index": 0, "explanation": "Clear documentation and shared mental models enable effective knowledge transfer."},
-                {"id": "p3_q6", "question": "When should you break a system into microservices?", "options": ["When independent scaling and deployment are needed", "Always, for every project", "Never", "When the team is small"], "correct_index": 0, "explanation": "Microservices are justified when components need independent scaling."},
-                {"id": "p3_q7", "question": "How does feedback loop quality affect outcomes?", "options": ["Faster, more accurate loops lead to better outcomes", "Loops are unnecessary", "Slower loops are better", "Feedback is only for managers"], "correct_index": 0, "explanation": "Faster and more accurate feedback loops consistently produce better outcomes."},
-                {"id": "p3_q8", "question": "What is the risk of over-engineering?", "options": ["Wasted effort on unused abstractions", "Better code quality", "No risk at all", "Faster delivery"], "correct_index": 0, "explanation": "Over-engineering wastes effort on abstractions that may never be needed."},
-                {"id": "p3_q9", "question": "How do you measure learning effectiveness?", "options": ["Ability to apply concepts to novel problems", "Pages read", "Time spent studying", "Number of certificates"], "correct_index": 0, "explanation": "True effectiveness is measured by applying concepts to novel, unseen problems."},
-                {"id": "p3_q10", "question": "What integrates all phases of understanding?", "options": ["Connecting recall, application, and critical evaluation", "Memorization alone", "Skipping fundamentals", "Avoiding challenges"], "correct_index": 0, "explanation": "Full understanding connects recall, practical application, and critical evaluation."},
+                {"id": "p3_q1", "question": "How do principles ensure reliability?", "options": ["Modular boundaries + verification", "Manual inspection", "Ignoring edge cases", "Hardcoding parameters"], "correct_index": 0, "explanation": "Modular design and verification ensure resilience.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p3_q2", "question": "Ultimate mastery goal?", "options": ["Pass one test", "Design and adapt solutions", "Copy templates", "Avoid discussions"], "correct_index": 1, "explanation": "Mastery means synthesising knowledge to solve novel problems.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p3_q3", "question": "Paramount architectural criterion?", "options": ["Social media popularity", "Domain fit and maintainability", "Fewest code lines", "Arbitrary preference"], "correct_index": 1, "explanation": "Maintainability and domain alignment drive the best choice.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p3_q4", "question": "How do you evaluate competing approaches?", "options": ["Compare trade-offs against constraints", "Pick the newest one", "Choose the simplest always", "Flip a coin"], "correct_index": 0, "explanation": "Evaluating trade-offs against domain constraints yields the best approach.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p3_q5", "question": "What makes knowledge transfer effective?", "options": ["Clear documentation and shared mental models", "Verbal instructions only", "No documentation needed", "Copy-pasting code"], "correct_index": 0, "explanation": "Clear documentation and shared mental models enable effective knowledge transfer.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p3_q6", "question": "When should you break a system into microservices?", "options": ["When independent scaling and deployment are needed", "Always, for every project", "Never", "When the team is small"], "correct_index": 0, "explanation": "Microservices are justified when components need independent scaling.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p3_q7", "question": "How does feedback loop quality affect outcomes?", "options": ["Faster, more accurate loops lead to better outcomes", "Loops are unnecessary", "Slower loops are better", "Feedback is only for managers"], "correct_index": 0, "explanation": "Faster and more accurate feedback loops consistently produce better outcomes.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p3_q8", "question": "What is the risk of over-engineering?", "options": ["Wasted effort on unused abstractions", "Better code quality", "No risk at all", "Faster delivery"], "correct_index": 0, "explanation": "Over-engineering wastes effort on abstractions that may never be needed.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p3_q9", "question": "How do you measure learning effectiveness?", "options": ["Ability to apply concepts to novel problems", "Pages read", "Time spent studying", "Number of certificates"], "correct_index": 0, "explanation": "True effectiveness is measured by applying concepts to novel, unseen problems.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                {"id": "p3_q10", "question": "What integrates all phases of understanding?", "options": ["Connecting recall, application, and critical evaluation", "Memorization alone", "Skipping fundamentals", "Avoiding challenges"], "correct_index": 0, "explanation": "Full understanding connects recall, practical application, and critical evaluation.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
             ],
         },
     }
@@ -411,8 +399,14 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str) -> dic
         "You are an expert AI assessment designer. Create a 3-phase multiple-choice quiz. "
         "Return JSON with top-level key 'phases' containing 'phase1', 'phase2', 'phase3'. "
         "Each phase has 'name', 'description', and 'questions' (list of exactly 10 questions). "
-        "Each question: 'id' (e.g. p1_q1 through p1_q10), 'question', 'options' (4 strings), 'correct_index' (0-3 int), 'explanation'. "
-        "Generate thoughtful, varied questions that test real comprehension — not trivial or repetitive."
+        "Each question MUST contain:\n"
+        "- 'id': string (e.g. p1_q1 through p1_q10)\n"
+        "- 'question': string\n"
+        "- 'options': list of 4 strings\n"
+        "- 'correct_index': integer (0-3)\n"
+        "- 'explanation': string explanation\n"
+        "- 'chunk_id': string (e.g. 'chunk_0', 'chunk_1', 'chunk_2' referencing explanation sections)\n"
+        "- 'concept_category': string (a broad tag like 'System Design', 'Recursion', 'Fundamentals', 'Algorithms')."
     )
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
@@ -439,10 +433,70 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str) -> dic
     raise HTTPException(status_code=422, detail="Failed to generate a valid quiz. Please try again.")
 
 
+async def call_groq_api_for_remediation(video_title: str, concept_title: str, original_explanation: str) -> dict:
+    if not settings.groq_api_key:
+        return {
+            "re_explanation": (
+                f"Let me explain '{concept_title}' with a fresh perspective! "
+                "Think of it like building a bridge: instead of looking at the whole structure at once, "
+                "you focus on reinforcing one key support pillar. By isolating this core rule, everything else clicks into place."
+            ),
+            "analogy": "Bridge support pillar analogy"
+        }
+
+    system_prompt = (
+        "You are an empathetic AI tutor providing targeted remediation for a student who missed a quiz question. "
+        "Provide a SHORT, focused re-explanation of JUST this ONE concept. Use a DIFFERENT phrasing or fresh analogy "
+        "than the original. Return JSON with two string keys: 're_explanation' (2-3 encouraging sentences) and "
+        "'analogy' (short title of the analogy used)."
+    )
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
+    payload = {
+        "model": settings.groq_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": (
+                    f"Video Topic: '{video_title}'\n"
+                    f"Concept to Remediate: '{concept_title}'\n"
+                    f"Original Explanation: {original_explanation[:2000]}\n\n"
+                    "Provide a targeted, fresh micro-explanation and analogy."
+                )
+            },
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.6,
+    }
+
+    async with httpx.AsyncClient(timeout=25.0) as client:
+        res = await client.post(url, headers=headers, json=payload)
+        if res.status_code == 200:
+            content = res.json()["choices"][0]["message"]["content"]
+            try:
+                parsed = json.loads(content) if isinstance(content, str) else content
+                if isinstance(parsed, dict) and "re_explanation" in parsed:
+                    return {
+                        "re_explanation": str(parsed.get("re_explanation", "")).strip(),
+                        "analogy": str(parsed.get("analogy", "")).strip() or None
+                    }
+            except Exception:
+                pass
+
+    return {
+        "re_explanation": (
+            f"Let's break down '{concept_title}' again! "
+            "Focus on the underlying core rule: each component has a specific job, and understanding how input transforms into output removes the confusion."
+        ),
+        "analogy": "Input-output transformation model"
+    }
+
+
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 
-@router.post("/extract", response_model=ExtractResponse, status_code=200,
-             summary="Extract transcript from a YouTube URL (10/day)")
+@router.post("/extract", response_model=ExtractResponse, status_code=200, summary="Extract transcript from YouTube URL")
 async def extract_youtube_transcript(
     payload: ExtractRequest,
     current_user: dict = Depends(get_current_user),
@@ -461,7 +515,7 @@ async def extract_youtube_transcript(
     )).scalar_one() or 0
 
     if count >= EXTRACTION_DAILY_LIMIT:
-        raise HTTPException(429, f"Daily limit of {EXTRACTION_DAILY_LIMIT} extractions reached. Try again tomorrow.")
+        raise HTTPException(429, f"Daily limit of {EXTRACTION_DAILY_LIMIT} extractions reached.")
 
     try:
         raw = await get_transcript_with_fallback(video_id)
@@ -499,8 +553,7 @@ async def extract_youtube_transcript(
     )
 
 
-@router.post("/explain", response_model=ExplainResponse, status_code=200,
-             summary="Generate AI explanation chunks (cached per video)")
+@router.post("/explain", response_model=ExplainResponse, status_code=200, summary="Generate AI explanation chunks")
 async def explain_youtube_transcript(
     payload: ExplainRequest,
     current_user: dict = Depends(get_current_user),
@@ -512,7 +565,6 @@ async def explain_youtube_transcript(
     if not video_id:
         video_id = f"custom_{uuid.uuid4().hex[:10]}"
 
-    # Cache lookup for real YouTube IDs
     cached_session = None
     if not video_id.startswith("custom_"):
         res = await db.execute(
@@ -585,13 +637,18 @@ async def explain_youtube_transcript(
 
 def sanitize_phase_questions(phase_dict: dict) -> List[QuizQuestionOut]:
     return [
-        QuizQuestionOut(id=q["id"], question=q["question"], options=q["options"])
+        QuizQuestionOut(
+            id=q["id"],
+            question=q["question"],
+            options=q["options"],
+            chunk_id=q.get("chunk_id", "chunk_0"),
+            concept_category=q.get("concept_category", "General Concept")
+        )
         for q in phase_dict.get("questions", [])
     ]
 
 
-@router.post("/{session_id}/quiz", response_model=QuizSessionOut, status_code=200,
-             summary="Get or generate 3-phase quiz for a learning session")
+@router.post("/{session_id}/quiz", response_model=QuizSessionOut, status_code=200, summary="Get/generate 3-phase quiz")
 async def get_or_create_quiz(
     session_id: str,
     current_user: dict = Depends(get_current_user),
@@ -655,8 +712,7 @@ async def get_or_create_quiz(
     )
 
 
-@router.post("/{session_id}/quiz/{phase}/submit", response_model=QuizSubmitResponse, status_code=200,
-             summary="Submit phase answers — graded locally, zero AI calls")
+@router.post("/{session_id}/quiz/{phase}/submit", response_model=QuizSubmitResponse, status_code=200, summary="Submit quiz phase answers")
 async def submit_quiz_phase(
     session_id: str,
     phase: int,
@@ -668,6 +724,7 @@ async def submit_quiz_phase(
         raise HTTPException(400, "Phase must be 1, 2, or 3.")
     try:
         session_uuid = uuid.UUID(session_id)
+        user_uuid = uuid.UUID(current_user["user_id"])
     except ValueError:
         raise HTTPException(404, "Learning session not found.")
 
@@ -691,17 +748,37 @@ async def submit_quiz_phase(
 
     correct_count = 0
     details: List[QuestionResultDetail] = []
+    failed_chunk_set = set()
+
     for q in questions:
         q_id, correct_idx = q["id"], q["correct_index"]
+        q_chunk_id = q.get("chunk_id", "chunk_0")
+        q_concept_cat = q.get("concept_category", "General Concept")
         user_idx = payload.answers.get(q_id, -1)
-        is_correct = user_idx == correct_idx
+        is_correct = (user_idx == correct_idx)
+
         if is_correct:
             correct_count += 1
-        details.append(QuestionResultDetail(
-            question_id=q_id, user_index=user_idx,
-            correct_index=correct_idx, is_correct=is_correct,
-            explanation=q.get("explanation", ""),
-        ))
+        else:
+            failed_chunk_set.add(q_chunk_id)
+            # Increment user concept gap profile for missed concept category
+            gap_stmt = select(UserConceptGap).where(
+                UserConceptGap.user_id == user_uuid,
+                UserConceptGap.concept_category == q_concept_cat
+            )
+            gap_res = await db.execute(gap_stmt)
+            existing_gap = gap_res.scalar_one_or_none()
+            if existing_gap:
+                existing_gap.miss_count += 1
+                existing_gap.last_seen_at = datetime.now(timezone.utc)
+                db.add(existing_gap)
+            else:
+                new_gap = UserConceptGap(
+                    user_id=user_uuid,
+                    concept_category=q_concept_cat,
+                    miss_count=1
+                )
+                db.add(new_gap)
 
     score = round(correct_count / len(questions) * 100.0, 1)
     passed = score >= 70.0
@@ -724,14 +801,149 @@ async def submit_quiz_phase(
         session.user_progress = updated_progress
         flag_modified(session, "user_progress")
         db.add(session)
-        await db.commit()
-        await db.refresh(session)
-        progress = updated_progress
+
+    await db.commit()
+    await db.refresh(session)
+
+    chunks = session.explanation_chunks.get("chunks", [])
+
+    for q in questions:
+        q_chunk_id = q.get("chunk_id", "chunk_0")
+        q_concept_cat = q.get("concept_category", "General Concept")
+        concept_title = q_concept_cat
+        if q_chunk_id.startswith("chunk_"):
+            try:
+                c_idx = int(q_chunk_id.replace("chunk_", ""))
+                if 0 <= c_idx < len(chunks):
+                    concept_title = chunks[c_idx].get("title", q_concept_cat)
+            except ValueError:
+                pass
+
+        user_idx = payload.answers.get(q["id"], -1)
+        details.append(QuestionResultDetail(
+            question_id=q["id"],
+            user_index=user_idx,
+            correct_index=q["correct_index"],
+            is_correct=(user_idx == q["correct_index"]),
+            explanation=q.get("explanation", ""),
+            chunk_id=q_chunk_id,
+            concept_title=concept_title,
+            concept_category=q_concept_cat
+        ))
 
     return QuizSubmitResponse(
         phase=phase, passed=passed, score_percent=score,
         correct_count=correct_count, total_questions=len(questions),
         passing_threshold_percent=70.0, next_phase_unlocked=next_unlocked,
-        is_session_completed=bool(progress.get("is_completed")),
+        is_session_completed=bool(session.user_progress.get("is_completed")),
         details=details,
+        failed_chunk_ids=list(failed_chunk_set)
+    )
+
+
+@router.post("/{session_id}/remediate", response_model=RemediateResponse, status_code=200, summary="Generate targeted concept micro-explanation")
+async def remediate_concept_chunk(
+    session_id: str,
+    payload: RemediateRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(404, "Learning session not found.")
+
+    res = await db.execute(select(LearningSession).where(LearningSession.id == session_uuid))
+    session = res.scalar_one_or_none()
+    if not session:
+        raise HTTPException(404, "Learning session not found.")
+
+    chunks = session.explanation_chunks.get("chunks", [])
+    if not chunks:
+        raise HTTPException(400, "No explanation chunks available.")
+
+    target_chunk = None
+    target_chunk_id = payload.chunk_id.strip()
+
+    if target_chunk_id.startswith("chunk_"):
+        try:
+            idx = int(target_chunk_id.replace("chunk_", ""))
+            if 0 <= idx < len(chunks):
+                target_chunk = chunks[idx]
+        except ValueError:
+            pass
+
+    if not target_chunk:
+        for idx, c in enumerate(chunks):
+            if c.get("title", "").strip().lower() == target_chunk_id.lower():
+                target_chunk = c
+                target_chunk_id = f"chunk_{idx}"
+                break
+
+    if not target_chunk:
+        target_chunk = chunks[0]
+        target_chunk_id = "chunk_0"
+
+    concept_title = target_chunk.get("title", "Concept Remediation")
+    original_exp = target_chunk.get("explanation", "")
+
+    remediation_cache = session.remediation_data or {}
+    if target_chunk_id in remediation_cache:
+        cached_item = remediation_cache[target_chunk_id]
+        return RemediateResponse(
+            session_id=str(session.id),
+            chunk_id=target_chunk_id,
+            concept_title=concept_title,
+            re_explanation=cached_item.get("re_explanation", ""),
+            analogy=cached_item.get("analogy"),
+            is_cached=True,
+        )
+
+    remediation_result = await call_groq_api_for_remediation(
+        session.video_title, concept_title, original_exp
+    )
+
+    remediation_cache[target_chunk_id] = remediation_result
+    session.remediation_data = dict(remediation_cache)
+    flag_modified(session, "remediation_data")
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+
+    return RemediateResponse(
+        session_id=str(session.id),
+        chunk_id=target_chunk_id,
+        concept_title=concept_title,
+        re_explanation=remediation_result["re_explanation"],
+        analogy=remediation_result.get("analogy"),
+        is_cached=False,
+    )
+
+
+@router.get("/me/gaps", response_model=UserGapsResponse, status_code=200, summary="Get student's recurring weak concept areas")
+async def get_user_concept_gaps(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user_uuid = uuid.UUID(current_user["user_id"])
+    stmt = (
+        select(UserConceptGap)
+        .where(UserConceptGap.user_id == user_uuid)
+        .order_by(UserConceptGap.miss_count.desc(), UserConceptGap.last_seen_at.desc())
+    )
+    res = await db.execute(stmt)
+    gaps = res.scalars().all()
+
+    gap_models = [
+        UserConceptGapOut(
+            concept_category=g.concept_category,
+            miss_count=g.miss_count,
+            last_seen_at=g.last_seen_at
+        )
+        for g in gaps
+    ]
+
+    return UserGapsResponse(
+        total_gaps_count=len(gap_models),
+        gaps=gap_models
     )
