@@ -17,6 +17,7 @@ from src.api.notifications import router as notifications_router
 from src.api.universities import router as universities_router
 from src.api.feed import router as feed_router
 from src.api.learn import router as learn_router
+from src.api.reva import router as reva_router
 
 app = FastAPI(
     title=settings.app_name,
@@ -40,6 +41,8 @@ app.include_router(universities_router, prefix="/api/v1")
 app.include_router(feed_router, prefix="/api/v1")
 # Wire the learn / extraction endpoints
 app.include_router(learn_router, prefix="/api/v1")
+# Wire the Reva AI Agent endpoints
+app.include_router(reva_router, prefix="/api/v1")
 # Wire the communities endpoints
 app.include_router(communities_router, prefix="/api/v1")
 # Wire the posts endpoints

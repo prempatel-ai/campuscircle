@@ -641,6 +641,7 @@ async def create_new_comment(
         )
         
     from src.repositories.comment_repository import create_comment
+    from src.services.reva_service import handle_reva_auto_reply_if_tagged
     try:
         comment = await create_comment(
             db=db,
@@ -649,6 +650,16 @@ async def create_new_comment(
             content=payload.content.strip(),
             parent_id=payload.parent_id
         )
+        try:
+            await handle_reva_auto_reply_if_tagged(
+                db=db,
+                post_id=post_uuid,
+                comment_content=payload.content.strip(),
+                user_id=user_uuid,
+                parent_comment_id=comment.id
+            )
+        except Exception as e:
+            print(f"[Reva Auto-Reply Error]: {e}")
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

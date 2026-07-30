@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # YouTube Transcript Proxy (Supadata — free 100 req/month, bypasses cloud IP blocks)
     supadata_api_key: str = ""
 
+    # Reva AI Agent Configuration (Separate env key for Grok-like platform bot & chatbot)
+    reva_groq_api_key: str = ""
+    reva_groq_model: str = "llama-3.3-70b-versatile"
+
     # CORS configuration
     cors_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
