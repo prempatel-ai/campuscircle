@@ -11,6 +11,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 import httpx
 from youtube_transcript_api import (
     YouTubeTranscriptApi,
@@ -707,20 +708,25 @@ async def submit_quiz_phase(
     next_unlocked = None
 
     if passed:
+        updated_progress = dict(progress)
         if phase == 1:
-            progress["phase1_passed"] = True
-            progress["current_phase"] = max(progress.get("current_phase", 1), 2)
+            updated_progress["phase1_passed"] = True
+            updated_progress["current_phase"] = max(updated_progress.get("current_phase", 1), 2)
             next_unlocked = 2
         elif phase == 2:
-            progress["phase2_passed"] = True
-            progress["current_phase"] = max(progress.get("current_phase", 1), 3)
+            updated_progress["phase2_passed"] = True
+            updated_progress["current_phase"] = max(updated_progress.get("current_phase", 1), 3)
             next_unlocked = 3
         elif phase == 3:
-            progress["phase3_passed"] = True
-            progress["is_completed"] = True
-        session.user_progress = progress
+            updated_progress["phase3_passed"] = True
+            updated_progress["is_completed"] = True
+        
+        session.user_progress = updated_progress
+        flag_modified(session, "user_progress")
         db.add(session)
         await db.commit()
+        await db.refresh(session)
+        progress = updated_progress
 
     return QuizSubmitResponse(
         phase=phase, passed=passed, score_percent=score,
