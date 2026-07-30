@@ -21,16 +21,20 @@ interface ExplainResponse {
 
 const SAMPLE_VIDEOS = [
   {
-    title: "Graph Data Structure Overview",
-    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    title: "Python in 100 Seconds",
+    url: "https://www.youtube.com/watch?v=x7X9w_GIm1s",
   },
   {
-    title: "System Design Fundamentals",
-    url: "https://www.youtube.com/watch?v=b1670bfe517",
+    title: "Docker Containers Overview",
+    url: "https://www.youtube.com/watch?v=Gjnup-PuquQ",
   },
   {
-    title: "FastAPI & Async Python Tutorial",
-    url: "https://www.youtube.com/watch?v=f9876543210",
+    title: "FastAPI Backend Crash Course",
+    url: "https://www.youtube.com/watch?v=0sOvCWFmrtA",
+  },
+  {
+    title: "SQL & Databases Explained",
+    url: "https://www.youtube.com/watch?v=zsjvFFKOm3c",
   },
 ];
 
