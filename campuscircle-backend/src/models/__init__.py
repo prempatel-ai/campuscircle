@@ -15,6 +15,7 @@ from src.models.refresh_token import RefreshToken
 from src.models.notification import Notification
 from src.models.bookmark import Bookmark
 from src.models.tag import Tag, post_tags
+from src.models.learn import LearnExtractionLog
 
 __all__ = [
     "University",
@@ -30,4 +31,5 @@ __all__ = [
     "Bookmark",
     "Tag",
     "post_tags",
+    "LearnExtractionLog",
 ]
