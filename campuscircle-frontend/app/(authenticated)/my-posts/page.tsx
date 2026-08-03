@@ -92,7 +92,7 @@ export default function MyPostsPage() {
   };
 
   return (
-    <div className="flex-1 max-w-2xl w-full mx-auto px-4 py-8 space-y-6">
+    <div className="flex-1 max-w-5xl w-full mx-auto py-6 space-y-6">
       {/* Header */}
       <div className="border-b border-border-muted/60 pb-4 space-y-1">
         <h1 className="font-display text-2xl font-bold text-primary">My Activity & Bookmarks</h1>

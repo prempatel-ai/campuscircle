@@ -132,7 +132,7 @@ export default function LearnPage() {
   };
 
   return (
-    <div className="flex-1 text-ink font-sans max-w-4xl mx-auto w-full px-4 py-8 pb-20">
+    <div className="flex-1 text-ink font-sans max-w-5xl mx-auto w-full py-6">
       {/* 1. INPUT STATE */}
       {viewState === "input" && (
         <div className="space-y-8 animate-in fade-in duration-200">

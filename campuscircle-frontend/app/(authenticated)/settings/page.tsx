@@ -193,7 +193,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-8 px-4 space-y-8">
+    <div className="w-full max-w-5xl mx-auto py-6 space-y-8">
       {/* Header Banner */}
       <div className="space-y-1 border-b border-border-muted pb-6">
         <h1 className="font-display text-3xl font-bold text-primary">Account & Profile Settings</h1>
