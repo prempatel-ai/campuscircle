@@ -385,7 +385,7 @@ export default function AskRevaPage() {
             </div>
           )}
 
-          <div className="bg-surface border border-border-muted/80 rounded-full px-4 py-2 shadow-lg flex items-center gap-3 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <div className="bg-surface border border-border-muted/80 rounded-full px-4 py-2 shadow-lg flex items-center gap-3 transition-all">
             <textarea
               rows={1}
               value={inputText}
@@ -397,7 +397,7 @@ export default function AskRevaPage() {
                 }
               }}
               placeholder="Ask Reva anything..."
-              className="flex-1 bg-transparent text-xs sm:text-sm text-ink placeholder:text-ink/40 outline-none border-none resize-none font-sans py-1 max-h-24"
+              className="flex-1 bg-transparent text-xs sm:text-sm text-ink placeholder:text-ink/40 outline-none border-none resize-none font-sans py-1 max-h-24 focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 shadow-none ring-0"
             />
 
             <div className="flex items-center gap-2 shrink-0">
