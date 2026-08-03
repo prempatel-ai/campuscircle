@@ -132,58 +132,70 @@ export default function LearnPage() {
   };
 
   return (
-    <div className="flex-1 text-ink font-sans max-w-5xl mx-auto w-full py-6">
-      {/* 1. INPUT STATE */}
-      {viewState === "input" && (
-        <div className="space-y-8 animate-in fade-in duration-200">
-          {/* Hero Header */}
-          <div className="text-center space-y-3 max-w-xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full font-mono text-xs font-bold">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    <div className="flex-1 text-ink font-sans grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 py-6 items-start">
+      {/* LEFT PANEL: Concept Gaps */}
+      <div className="hidden lg:block lg:col-span-3 lg:sticky lg:top-20 space-y-4">
+        <div className="bg-surface-subtle border border-border-muted/70 rounded-2xl p-5 space-y-3.5 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-border-muted/50 pb-2.5">
+            <h3 className="font-display text-sm font-bold text-primary flex items-center gap-2">
+              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
-              <span>AI Learning Accelerator</span>
-            </div>
-            <h1 className="font-display text-3xl sm:text-4xl font-bold text-primary tracking-tight">
-              Turn Any Topic into Mastery
-            </h1>
-            <p className="font-sans text-sm sm:text-base text-ink/75 leading-relaxed">
-              Paste a YouTube link or study notes to generate storytelling explanations and test your retention with an adaptive 3-phase quiz.
-            </p>
+              <span>Concept Gaps</span>
+            </h3>
+            {userGaps.length > 0 && (
+              <span className="text-[10px] font-mono font-bold text-primary px-2 py-0.5 bg-primary/10 rounded-full">
+                {userGaps.length}
+              </span>
+            )}
           </div>
 
-          {/* DASHBOARD: REVIEW YOUR CONCEPT GAPS */}
-          {userGaps.length > 0 && (
-            <div className="bg-surface border border-primary/20 rounded-2xl p-6 shadow-2xs space-y-3 bg-gradient-to-r from-primary/5 to-transparent">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                  <h3 className="font-display text-sm font-bold text-primary">Review Your Concept Gaps</h3>
+          <p className="font-sans text-xs text-ink/75 leading-relaxed">
+            Concepts flagged for review based on your previous adaptive quiz performance.
+          </p>
+
+          {userGaps.length === 0 ? (
+            <div className="p-3 bg-surface border border-border-muted/60 rounded-xl text-center">
+              <p className="text-xs font-sans text-ink/50">No concept gaps yet. Complete a quiz to track weak areas!</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 pt-1">
+              {userGaps.map((g, idx) => (
+                <div key={idx} className="p-2.5 bg-surface border border-border-muted/60 rounded-xl flex items-center justify-between text-xs font-sans shadow-2xs">
+                  <span className="font-semibold text-ink truncate">{g.concept_category}</span>
+                  <span className="px-2 py-0.5 bg-red-100 text-red-700 font-mono text-[10px] font-bold rounded-md shrink-0">
+                    {g.miss_count} miss{g.miss_count > 1 ? "es" : ""}
+                  </span>
                 </div>
-                <span className="text-[11px] font-mono font-bold text-primary px-2.5 py-0.5 bg-primary/10 rounded-full">
-                  {userGaps.length} Weak Area{userGaps.length > 1 ? "s" : ""}
-                </span>
-              </div>
-              <p className="font-sans text-xs text-ink/75">
-                These concepts caused repeated quiz misses across your studied topics:
-              </p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {userGaps.map((g, idx) => (
-                  <div key={idx} className="px-3 py-1.5 bg-background border border-border-muted rounded-xl flex items-center gap-2 text-xs font-sans">
-                    <span className="font-bold text-ink">{g.concept_category}</span>
-                    <span className="px-1.5 py-0.5 bg-red-100 text-red-700 font-mono text-[10px] font-bold rounded-md">
-                      {g.miss_count} miss{g.miss_count > 1 ? "es" : ""}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           )}
+        </div>
+      </div>
 
-          {/* Main Card */}
-          <div className="bg-surface border border-border-muted rounded-2xl p-6 sm:p-8 space-y-6 shadow-2xs">
+      {/* CENTER COLUMN: Main Learn & Quiz Content */}
+      <div className="lg:col-span-6 w-full space-y-6">
+        {/* 1. INPUT STATE */}
+        {viewState === "input" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Hero Header */}
+            <div className="space-y-2 border-b border-border-muted/50 pb-4">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full font-mono text-[11px] font-bold">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <span>AI Learning Accelerator</span>
+              </div>
+              <h1 className="font-display text-2xl sm:text-3xl font-bold text-primary tracking-tight">
+                Turn Any Topic into Mastery
+              </h1>
+              <p className="font-sans text-xs sm:text-sm text-ink/75 leading-relaxed">
+                Paste a YouTube link or study notes to generate storytelling explanations and test your retention with an adaptive 3-phase quiz.
+              </p>
+            </div>
+
+            {/* Main Card */}
+            <div className="bg-surface border border-border-muted rounded-2xl p-6 space-y-6 shadow-2xs">
             {/* Input Mode Selector (URL vs Text) */}
             <div className="flex items-center gap-2 border-b border-border-muted pb-4">
               <button
@@ -349,6 +361,34 @@ export default function LearnPage() {
           onBackToExplanation={() => setViewState("explanation")}
         />
       )}
+      </div>
+
+      {/* RIGHT PANEL: How It Works */}
+      <div className="hidden lg:flex lg:col-span-3 flex-col gap-5 lg:sticky lg:top-20">
+        <div className="bg-surface-subtle border border-border-muted/70 rounded-2xl p-5 space-y-4 shadow-2xs">
+          <h3 className="font-display text-sm font-bold text-primary flex items-center gap-2 border-b border-border-muted/50 pb-2.5">
+            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>How Learn AI Works</span>
+          </h3>
+
+          <div className="space-y-3 font-sans text-xs text-ink/75 leading-relaxed">
+            <div className="flex gap-2.5 items-start">
+              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+              <p><strong className="text-ink">Input Material:</strong> Paste a YouTube video link or lecture notes in any supported language.</p>
+            </div>
+            <div className="flex gap-2.5 items-start">
+              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">2</span>
+              <p><strong className="text-ink">Story Chunks:</strong> AI breaks down complex topics into bite-sized storytelling chapters.</p>
+            </div>
+            <div className="flex gap-2.5 items-start">
+              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">3</span>
+              <p><strong className="text-ink">3-Phase Quiz:</strong> Test recall and identify weak concept gaps for targeted review.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

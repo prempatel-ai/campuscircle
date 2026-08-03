@@ -193,23 +193,48 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="w-full max-w-5xl mx-auto py-6 space-y-8">
-      {/* Header Banner */}
-      <div className="space-y-1 border-b border-border-muted pb-6">
-        <h1 className="font-display text-3xl font-bold text-primary">Account & Profile Settings</h1>
-        <p className="font-sans text-sm text-ink/75">
-          Manage your username handle, security credentials, notification alerts, and account preferences.
-        </p>
+    <div className="flex-1 text-ink font-sans grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 py-6 items-start">
+      {/* LEFT PANEL: Quick Navigation */}
+      <div className="hidden lg:block lg:col-span-3 lg:sticky lg:top-20 space-y-4">
+        <div className="bg-surface-subtle border border-border-muted/70 rounded-2xl p-4 space-y-3 shadow-2xs">
+          <h3 className="font-mono text-xs font-bold text-ink/40 uppercase tracking-wider px-2">
+            Settings Menu
+          </h3>
+          <nav className="flex flex-col gap-1 font-sans text-xs font-semibold">
+            <a href="#profile" className="px-3 py-2 rounded-xl text-ink/80 hover:text-primary hover:bg-surface transition-all">
+              Profile & Handle
+            </a>
+            <a href="#security" className="px-3 py-2 rounded-xl text-ink/80 hover:text-primary hover:bg-surface transition-all">
+              Password & Security
+            </a>
+            <a href="#notifications" className="px-3 py-2 rounded-xl text-ink/80 hover:text-primary hover:bg-surface transition-all">
+              Notifications
+            </a>
+            <a href="#danger" className="px-3 py-2 rounded-xl text-red-600 hover:bg-red-50 transition-all">
+              Danger Zone
+            </a>
+          </nav>
+        </div>
       </div>
 
-      {fetchError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-sans">
-          {fetchError}
+      {/* CENTER COLUMN: Settings Forms */}
+      <div className="lg:col-span-6 w-full space-y-6">
+        {/* Header Banner */}
+        <div className="space-y-1 border-b border-border-muted pb-4">
+          <h1 className="font-display text-2xl font-bold text-primary">Account & Profile Settings</h1>
+          <p className="font-sans text-xs text-ink/75">
+            Manage your username handle, security credentials, and notification preferences.
+          </p>
         </div>
-      )}
 
-      {/* 1. Account Info & Username Section */}
-      <section className="bg-surface border border-border-muted rounded-2xl p-6 space-y-6 shadow-2xs">
+        {fetchError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-sans">
+            {fetchError}
+          </div>
+        )}
+
+        {/* 1. Account Info & Username Section */}
+        <section id="profile" className="bg-surface border border-border-muted rounded-2xl p-6 space-y-6 shadow-2xs">
         <div className="flex items-center gap-4 border-b border-border-muted/50 pb-5">
           <AnonAvatar username={profile?.username || user?.username || "user"} size={56} shape="circle" />
           <div className="flex flex-col">
@@ -263,7 +288,7 @@ export default function SettingsPage() {
       </section>
 
       {/* 2. Change Password Section */}
-      <section className="bg-surface border border-border-muted rounded-2xl p-6 space-y-6 shadow-2xs">
+      <section id="security" className="bg-surface border border-border-muted rounded-2xl p-6 space-y-6 shadow-2xs">
         <div className="border-b border-border-muted/50 pb-4">
           <h2 className="font-display text-lg font-bold text-primary flex items-center gap-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,7 +361,7 @@ export default function SettingsPage() {
       </section>
 
       {/* 3. Notification Preferences */}
-      <section className="bg-surface border border-border-muted rounded-2xl p-6 space-y-6 shadow-2xs">
+      <section id="notifications" className="bg-surface border border-border-muted rounded-2xl p-6 space-y-6 shadow-2xs">
         <div className="border-b border-border-muted/50 pb-4">
           <h2 className="font-display text-lg font-bold text-primary flex items-center gap-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -386,7 +411,7 @@ export default function SettingsPage() {
       </section>
 
       {/* 4. Danger Zone (Delete Account) */}
-      <section className="bg-surface border border-red-200 rounded-2xl p-6 space-y-4 shadow-2xs">
+      <section id="danger" className="bg-surface border border-red-200 rounded-2xl p-6 space-y-4 shadow-2xs">
         <div className="border-b border-red-100 pb-3">
           <h2 className="font-display text-lg font-bold text-red-700 flex items-center gap-2">
             <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -457,6 +482,24 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+      </div>
+
+      {/* RIGHT PANEL: Security & Privacy Info */}
+      <div className="hidden lg:flex lg:col-span-3 flex-col gap-5 lg:sticky lg:top-20">
+        <div className="bg-surface-subtle border border-border-muted/70 rounded-2xl p-5 space-y-3.5 shadow-2xs">
+          <h3 className="font-display text-sm font-bold text-primary flex items-center gap-2 border-b border-border-muted/50 pb-2.5">
+            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <span>Account Security</span>
+          </h3>
+          <div className="space-y-3 text-xs font-sans text-ink/75 leading-relaxed">
+            <p><strong className="text-ink">Session Protection:</strong> Updating your password invalidates all other active device tokens.</p>
+            <p><strong className="text-ink">Handle Rate Limit:</strong> Username changes are rate limited to once every 30 days.</p>
+            <p><strong className="text-ink">Soft Deletion:</strong> Deleting an account anonymizes past posts to [deleted] without breaking comment threads.</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
