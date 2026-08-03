@@ -310,15 +310,15 @@ function FeedContent() {
 
         {/* Feed Sort Tabs */}
         {!isCommunitiesLoading && !searchQueryParam && (communities.length > 0 || sort === "for-you") && !error && (
-          <div className="flex bg-surface rounded-xl p-1 border border-border-muted w-full shadow-2xs">
+          <div className="flex bg-surface-subtle p-1 rounded-2xl border border-border-muted/70 w-full shadow-2xs">
             {SORT_OPTIONS.map((s) => (
               <button
                 key={s}
                 onClick={() => setSort(s)}
-                className={`flex-1 py-2 text-[11px] sm:text-xs font-mono font-bold capitalize rounded-lg transition-all cursor-pointer whitespace-nowrap text-center px-1 ${
+                className={`flex-1 py-1.5 text-xs font-sans capitalize rounded-xl transition-all cursor-pointer whitespace-nowrap text-center px-2 ${
                   sort === s
-                    ? "bg-primary text-surface shadow-sm"
-                    : "text-ink/60 hover:text-ink"
+                    ? "bg-surface text-primary font-extrabold shadow-2xs border border-border-muted/50"
+                    : "text-ink/60 font-semibold hover:text-ink"
                 }`}
               >
                 {s === "for-you" ? "For You" : s}
