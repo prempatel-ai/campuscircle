@@ -222,9 +222,9 @@ export default function AskRevaPage() {
   const hasStarted = messages.length > 0 || activeConversationId !== null;
 
   return (
-    <div className="flex-1 text-ink font-sans grid grid-cols-1 lg:grid-cols-12 gap-6 py-4 items-start min-h-[calc(100vh-6rem)]">
-      {/* 1. Left Conversation Sidebar (Quiet & Understated) */}
-      <div className="hidden lg:block lg:col-span-3 lg:sticky lg:top-20 pr-2">
+    <div className="flex-1 text-ink font-sans grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 py-6 items-start">
+      {/* 1. Left Conversation Sidebar Panel (Cols 1-3) */}
+      <div className="hidden lg:block lg:col-span-3 lg:sticky lg:top-20 bg-surface-subtle border border-border-muted/70 rounded-2xl p-4 shadow-2xs">
         <RevaChatSidebar
           conversations={conversations}
           activeConversationId={activeConversationId}
@@ -236,8 +236,8 @@ export default function AskRevaPage() {
         />
       </div>
 
-      {/* 2. Main Open Chat Area (Centered 700-800px Reading Column) */}
-      <div className="lg:col-span-9 w-full flex flex-col items-center justify-between min-h-[calc(100vh-7rem)]">
+      {/* 2. Center Reading Chat Column (Cols 4-9) */}
+      <div className="lg:col-span-6 w-full flex flex-col items-center justify-between min-h-[calc(100vh-8rem)]">
         <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col space-y-6">
           {/* Header */}
           <div className="space-y-1 border-b border-border-muted/50 pb-4">
@@ -249,7 +249,7 @@ export default function AskRevaPage() {
 
           {!hasStarted ? (
             /* INITIAL OPEN STATE - VERTICALLY CENTERED */
-            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 my-auto min-h-[50vh]">
+            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 my-auto min-h-[45vh]">
               <div className="space-y-2">
                 <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-2">
                   <AnonAvatar username="reva" size={40} shape="circle" />
@@ -403,6 +403,47 @@ export default function AskRevaPage() {
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" />
                 </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Right Info & Quick Prompt Panel (Cols 10-12) */}
+      <div className="hidden lg:flex lg:col-span-3 flex-col gap-5 lg:sticky lg:top-20">
+        <div className="bg-surface-subtle border border-border-muted/70 rounded-2xl p-5 space-y-4 shadow-2xs">
+          <h3 className="font-display text-sm font-bold text-primary flex items-center gap-2">
+            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>Reva Capabilities</span>
+          </h3>
+          <p className="font-sans text-xs text-ink/75 leading-relaxed">
+            Trained on campus discussions, course notes, and past viva exams. Tag @reva in any post comment.
+          </p>
+
+          <div className="space-y-2 pt-2 border-t border-border-muted/50">
+            <span className="font-mono text-[10px] font-bold text-ink/40 uppercase tracking-wider">
+              Quick Starters
+            </span>
+            <div className="flex flex-col gap-1.5">
+              <button
+                onClick={() => handleSendMessage("Explain SQL Joins with real examples")}
+                className="text-left p-2.5 bg-surface hover:bg-background border border-border-muted/60 rounded-xl text-xs font-sans text-ink/80 hover:text-primary transition-all cursor-pointer shadow-2xs"
+              >
+                "Explain SQL Joins with examples"
+              </button>
+              <button
+                onClick={() => handleSendMessage("Give me top 5 DBMS viva questions")}
+                className="text-left p-2.5 bg-surface hover:bg-background border border-border-muted/60 rounded-xl text-xs font-sans text-ink/80 hover:text-primary transition-all cursor-pointer shadow-2xs"
+              >
+                "Top 5 DBMS viva questions"
+              </button>
+              <button
+                onClick={() => handleSendMessage("Summarize recent discussions on campus")}
+                className="text-left p-2.5 bg-surface hover:bg-background border border-border-muted/60 rounded-xl text-xs font-sans text-ink/80 hover:text-primary transition-all cursor-pointer shadow-2xs"
+              >
+                "Summarize recent campus posts"
               </button>
             </div>
           </div>
