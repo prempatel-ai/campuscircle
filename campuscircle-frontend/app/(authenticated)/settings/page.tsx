@@ -10,8 +10,8 @@ interface UserProfile {
   id: string;
   university_id: string;
   email: string;
-  username: str;
-  role: str;
+  username: string;
+  role: string;
   notifications_enabled: boolean;
   is_deleted: boolean;
   last_username_change_at: string | null;
