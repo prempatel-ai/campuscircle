@@ -383,15 +383,16 @@ export default function SettingsPage() {
           </div>
 
           <button
+            type="button"
             onClick={() => handleToggleNotifications(!notificationsEnabled)}
             disabled={notifSaving}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer ${
               notificationsEnabled ? "bg-primary" : "bg-gray-300"
             }`}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                notificationsEnabled ? "translate-x-6" : "translate-x-1"
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition-transform duration-200 ease-in-out ${
+                notificationsEnabled ? "translate-x-5" : "translate-x-0"
               }`}
             />
           </button>
