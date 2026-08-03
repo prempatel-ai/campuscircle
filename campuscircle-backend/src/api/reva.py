@@ -49,7 +49,9 @@ def _generate_title_from_message(message: str) -> str:
             msg = msg[len(p):].strip()
             break
     title = msg[:60].strip().rstrip(".,;: ")
-    return title if title and len(title) >= 3 else "New Chat"
+    if title:
+        return title[0].upper() + title[1:]
+    return "Campus Discussion"
 
 
 # ── Existing chat endpoint (kept for backward compatibility) ──
@@ -104,7 +106,16 @@ async def list_conversations(
         .order_by(Conversation.updated_at.desc())
     )
     res = await db.execute(stmt)
-    items = list(res.scalars().all())
+    all_convs = list(res.scalars().all())
+
+    # Only include conversations that have at least 1 message
+    items = []
+    for c in all_convs:
+        count_stmt = select(func.count(ChatMessage.id)).where(ChatMessage.conversation_id == c.id)
+        msg_count = (await db.execute(count_stmt)).scalar() or 0
+        if msg_count > 0:
+            items.append(c)
+
     return ConversationListOut(items=items, total=len(items))
 
 
@@ -196,11 +207,13 @@ async def send_message(
     )
     db.add(reva_message)
 
-    # Generate title if this is the first exchange
+    # Update title if title is currently default or empty
     new_title = None
-    if existing_count == 0:
+    if not conv.title or conv.title.strip() in ("", "New Chat"):
         new_title = _generate_title_from_message(payload.message)
         conv.title = new_title
+    else:
+        new_title = conv.title
 
     conv.updated_at = func.now()
     await db.commit()
