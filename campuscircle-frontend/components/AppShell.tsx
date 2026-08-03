@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { AnonAvatar } from "@/components/AnonAvatar";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -238,6 +239,11 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                   </a>
                 </div>
 
+                {/* Install App */}
+                <div className="border-t border-border-muted/50 pt-1 mt-1">
+                  <InstallPrompt variant="dropdown" />
+                </div>
+
                 {/* Logout Item */}
                 <div className="border-t border-border-muted/50 pt-1 mt-1">
                   <button
@@ -258,6 +264,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
       {/* Main Page Children Container */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col pb-20 md:pb-6">{children}</main>
+
+      {/* PWA Install Banner */}
+      <InstallPrompt variant="banner" />
 
       {/* Persistent Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border-muted/80 px-4 py-1.5 flex items-center justify-around shadow-lg">
