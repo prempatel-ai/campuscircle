@@ -265,7 +265,7 @@ export default function AskRevaPage() {
   return (
     <div className="flex-1 text-ink font-sans grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 py-6 items-start">
       {/* 1. Left Sidebar Column */}
-      <div className="lg:col-span-3 lg:sticky lg:top-20 bg-surface border border-border-muted rounded-2xl p-4 shadow-2xs">
+      <div className="lg:col-span-3 lg:sticky lg:top-20 bg-surface-subtle border border-border-muted/70 rounded-2xl p-4 shadow-2xs">
         <RevaChatSidebar
           conversations={conversations}
           activeConversationId={activeConversationId}

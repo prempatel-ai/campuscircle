@@ -8,6 +8,7 @@
   /* Design Token Colors */
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
   --color-ink: var(--ink);
   --color-primary: var(--primary);
   --color-accent: var(--accent);
@@ -48,6 +49,7 @@
   /* Theme tokens based on the design system */
   --background: #F5F6F4;
   --surface: #FFFFFF;
+  --surface-subtle: #EEF2EE;
   --ink: #14171A;
   --primary: #2F5233;
   --accent: #E8A33D;

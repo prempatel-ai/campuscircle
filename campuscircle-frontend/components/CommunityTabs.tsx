@@ -80,9 +80,9 @@ export const CommunityTabs: React.FC<CommunityTabsProps> = ({
           </button>
         )}
 
-        {/* Communities Section */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between px-2">
+        {/* Communities Section Card */}
+        <div className="bg-surface-subtle border border-border-muted/70 rounded-2xl p-4 shadow-2xs flex flex-col gap-2">
+          <div className="flex items-center justify-between px-1">
             <h3 className="font-mono text-xs font-bold text-ink/40 uppercase tracking-wider">
               Communities
             </h3>
