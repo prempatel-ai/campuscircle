@@ -141,8 +141,9 @@ export default function AskRevaPage() {
     }
   }, [activeConversationId]);
 
-  const sendMessageToActiveConversation = useCallback(async (textToSend: string) => {
-    if (!activeConversationId) return;
+  const sendMessageToActiveConversation = useCallback(async (textToSend: string, targetConvId?: string) => {
+    const convId = targetConvId || activeConversationId;
+    if (!convId) return;
 
     const userMsg: ChatMessage = {
       id: `user_${Date.now()}`,
@@ -160,7 +161,7 @@ export default function AskRevaPage() {
         user_message: ApiMessage;
         reva_message: ApiMessage;
         title: string | null;
-      }>(`/api/v1/reva/conversations/${activeConversationId}/messages`, {
+      }>(`/api/v1/reva/conversations/${convId}/messages`, {
         method: "POST",
         body: JSON.stringify({ message: textToSend }),
       });
@@ -171,19 +172,19 @@ export default function AskRevaPage() {
       if (res.title) {
         setConversations((prev) =>
           prev.map((c) =>
-            c.id === activeConversationId ? { ...c, title: res.title! } : c
+            c.id === convId ? { ...c, title: res.title! } : c
           )
         );
       }
 
       setConversations((prev) => {
         const updated = prev.map((c) =>
-          c.id === activeConversationId
+          c.id === convId
             ? { ...c, updated_at: new Date().toISOString() }
             : c
         );
-        const moved = updated.filter((c) => c.id === activeConversationId);
-        const rest = updated.filter((c) => c.id !== activeConversationId);
+        const moved = updated.filter((c) => c.id === convId);
+        const rest = updated.filter((c) => c.id !== convId);
         return [...moved, ...rest];
       });
     } catch (err) {
@@ -209,14 +210,14 @@ export default function AskRevaPage() {
         });
         setConversations((prev) => [conv, ...prev]);
         setActiveConversationId(conv.id);
-        await sendMessageToActiveConversation(textToSend);
+        await sendMessageToActiveConversation(textToSend, conv.id);
       } catch (err) {
         setError("Failed to create conversation.");
       }
       return;
     }
 
-    await sendMessageToActiveConversation(textToSend);
+    await sendMessageToActiveConversation(textToSend, activeConversationId);
   };
 
   const username = user?.username || "student";

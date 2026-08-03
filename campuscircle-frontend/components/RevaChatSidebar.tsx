@@ -44,13 +44,8 @@ export const RevaChatSidebar: React.FC<RevaChatSidebarProps> = ({
   onSelect,
   onDelete,
 }) => {
-  // Filter out empty placeholder conversations (title: "New Chat") so duplicate entries don't appear
-  const realConversations = conversations.filter(
-    (c) => c.title && c.title.trim() !== "" && c.title.toLowerCase() !== "new chat"
-  );
-
   const grouped: Record<string, Conversation[]> = {};
-  for (const conv of realConversations) {
+  for (const conv of conversations) {
     const group = getDateGroup(conv.updated_at);
     if (!grouped[group]) grouped[group] = [];
     grouped[group].push(conv);
@@ -91,7 +86,7 @@ export const RevaChatSidebar: React.FC<RevaChatSidebarProps> = ({
       )}
 
       {/* Empty State */}
-      {!isLoading && !error && realConversations.length === 0 && (
+      {!isLoading && !error && conversations.length === 0 && (
         <div className="py-8 px-2 text-center space-y-1">
           <MessageSquare className="w-5 h-5 text-ink/20 mx-auto" />
           <p className="text-[11px] font-sans text-ink/40">No conversations</p>
@@ -99,7 +94,7 @@ export const RevaChatSidebar: React.FC<RevaChatSidebarProps> = ({
       )}
 
       {/* Minimal Conversation List */}
-      {!isLoading && !error && realConversations.length > 0 && (
+      {!isLoading && !error && conversations.length > 0 && (
         <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[calc(100vh-14rem)]">
           {groupOrder.map((group) => {
             const items = grouped[group];
