@@ -315,7 +315,7 @@ function FeedContent() {
               <button
                 key={s}
                 onClick={() => setSort(s)}
-                className={`flex-1 py-2 text-xs font-mono font-bold capitalize rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 py-2 text-[11px] sm:text-xs font-mono font-bold capitalize rounded-lg transition-all cursor-pointer whitespace-nowrap text-center px-1 ${
                   sort === s
                     ? "bg-primary text-surface shadow-sm"
                     : "text-ink/60 hover:text-ink"
@@ -389,11 +389,22 @@ function FeedContent() {
         </div>
       </div>
 
+      {/* Mobile Floating Action Button (+ New Post) */}
+      <button
+        onClick={() => setIsComposing(true)}
+        aria-label="Create new post"
+        className="md:hidden fixed right-4 bottom-20 z-40 w-12 h-12 bg-primary hover:bg-[#1F3E23] text-surface rounded-full shadow-xl flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
+
       {/* Compose Dialog */}
-      {isComposing && selectedCommunityId && (
+      {isComposing && (
         <ComposePost
-          communityId={selectedCommunityId}
-          communityName={communities.find((c) => c.id === selectedCommunityId)?.name || "community"}
+          communityId={selectedCommunityId || communities[0]?.id || ""}
+          communityName={communities.find((c) => c.id === selectedCommunityId)?.name || communities[0]?.name || "community"}
           onClose={() => setIsComposing(false)}
           onSuccess={handlePostCreated}
         />
