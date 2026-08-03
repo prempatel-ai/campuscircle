@@ -75,13 +75,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               </span>
             </Link>
 
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden md:flex items-center gap-6">
               <Link
                 href="/feed"
-                className={`px-3 py-1.5 rounded-lg text-xs font-sans font-bold transition-all flex items-center gap-1.5 ${
+                className={`py-2 text-xs font-sans transition-all flex items-center gap-1.5 border-b-2 ${
                   pathname.startsWith("/feed")
-                    ? "bg-primary/10 text-primary"
-                    : "text-ink/60 hover:text-ink hover:bg-background"
+                    ? "border-primary text-primary font-extrabold"
+                    : "border-transparent text-ink/60 hover:text-ink font-semibold"
                 }`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -91,10 +91,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               </Link>
               <Link
                 href="/learn"
-                className={`px-3 py-1.5 rounded-lg text-xs font-sans font-bold transition-all flex items-center gap-1.5 ${
+                className={`py-2 text-xs font-sans transition-all flex items-center gap-1.5 border-b-2 ${
                   pathname.startsWith("/learn")
-                    ? "bg-primary/10 text-primary"
-                    : "text-ink/60 hover:text-ink hover:bg-background"
+                    ? "border-primary text-primary font-extrabold"
+                    : "border-transparent text-ink/60 hover:text-ink font-semibold"
                 }`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -104,10 +104,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               </Link>
               <Link
                 href="/ask-reva"
-                className={`px-3 py-1.5 rounded-lg text-xs font-sans font-bold transition-all flex items-center gap-1.5 ${
+                className={`py-2 text-xs font-sans transition-all flex items-center gap-1.5 border-b-2 ${
                   pathname.startsWith("/ask-reva")
-                    ? "bg-primary/10 text-primary"
-                    : "text-ink/60 hover:text-ink hover:bg-background"
+                    ? "border-primary text-primary font-extrabold"
+                    : "border-transparent text-ink/60 hover:text-ink font-semibold"
                 }`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -248,8 +248,8 @@ export default function AskRevaPage() {
           </div>
 
           {!hasStarted ? (
-            /* INITIAL OPEN STATE */
-            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 py-12">
+            /* INITIAL OPEN STATE - VERTICALLY CENTERED */
+            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 my-auto min-h-[50vh]">
               <div className="space-y-2">
                 <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-2">
                   <AnonAvatar username="reva" size={40} shape="circle" />
