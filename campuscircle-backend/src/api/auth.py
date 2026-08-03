@@ -258,7 +258,7 @@ async def login(
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     
-    if not user or not verify_password(payload.password, user.password_hash):
+    if not user or user.is_deleted or not verify_password(payload.password, user.password_hash):
         login_email_limiter.record(email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -311,7 +311,7 @@ async def refresh(
             detail="Invalid or expired refresh token."
         )
         
-    stmt = select(User).where(User.id == user_id)
+    stmt = select(User).where(User.id == user_id, User.is_deleted == False)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     

@@ -164,7 +164,7 @@ async def get_posts(
     base_query = (
         select(
             Post,
-            User.username.label("author_username"),
+            case((User.is_deleted == True, "[deleted]"), else_=User.username).label("author_username"),
             comment_count_col.label("comment_count"),
             func.coalesce(thread_total_col, 1).label("thread_total_parts")
         )
@@ -243,7 +243,7 @@ async def get_post_by_id(
     stmt = (
         select(
             Post,
-            User.username.label("author_username"),
+            case((User.is_deleted == True, "[deleted]"), else_=User.username).label("author_username"),
             comment_count_col.label("comment_count"),
             func.coalesce(thread_total_col, 1).label("thread_total_parts")
         )
@@ -286,7 +286,7 @@ async def get_thread_posts(
     stmt = (
         select(
             Post,
-            User.username.label("author_username"),
+            case((User.is_deleted == True, "[deleted]"), else_=User.username).label("author_username"),
             comment_count_col.label("comment_count"),
             func.coalesce(thread_total_col, 1).label("thread_total_parts")
         )
@@ -333,7 +333,7 @@ async def get_user_posts(
     base_query = (
         select(
             Post,
-            User.username.label("author_username"),
+            case((User.is_deleted == True, "[deleted]"), else_=User.username).label("author_username"),
             comment_count_col.label("comment_count"),
             func.coalesce(thread_total_col, 1).label("thread_total_parts")
         )
@@ -399,7 +399,7 @@ async def search_posts(
     base_query = (
         select(
             Post,
-            User.username.label("author_username"),
+            case((User.is_deleted == True, "[deleted]"), else_=User.username).label("author_username"),
             comment_count_col.label("comment_count"),
             func.coalesce(thread_total_col, 1).label("thread_total_parts")
         )
@@ -475,7 +475,7 @@ async def search_university_posts(
     base_query = (
         select(
             Post,
-            User.username.label("author_username"),
+            case((User.is_deleted == True, "[deleted]"), else_=User.username).label("author_username"),
             comment_count_col.label("comment_count"),
             func.coalesce(thread_total_col, 1).label("thread_total_parts")
         )
@@ -577,7 +577,7 @@ async def get_saved_posts(
     base_query = (
         select(
             Post,
-            User.username.label("author_username"),
+            case((User.is_deleted == True, "[deleted]"), else_=User.username).label("author_username"),
             comment_count_col.label("comment_count"),
             func.coalesce(thread_total_col, 1).label("thread_total_parts")
         )
@@ -646,7 +646,7 @@ async def get_commented_posts(
     base_query = (
         select(
             Post,
-            User.username.label("author_username"),
+            case((User.is_deleted == True, "[deleted]"), else_=User.username).label("author_username"),
             comment_count_col.label("comment_count"),
             func.coalesce(thread_total_col, 1).label("thread_total_parts")
         )
@@ -722,7 +722,7 @@ async def get_for_you_feed(
     base_query = (
         select(
             Post,
-            User.username.label("author_username"),
+            case((User.is_deleted == True, "[deleted]"), else_=User.username).label("author_username"),
             comment_count_col.label("comment_count"),
             func.coalesce(thread_total_col, 1).label("thread_total_parts")
         )

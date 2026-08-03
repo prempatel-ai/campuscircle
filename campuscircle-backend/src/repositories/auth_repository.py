@@ -62,7 +62,8 @@ async def validate_refresh_token(db: AsyncSession, raw_token: str) -> Optional[u
         
     # Compare timezone-aware expires_at with current timezone-aware UTC datetime
     now = datetime.now(timezone.utc)
-    if db_token.expires_at <= now:
+    expires_at = db_token.expires_at if db_token.expires_at.tzinfo else db_token.expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= now:
         return None
         
     return db_token.user_id
@@ -78,18 +79,24 @@ async def revoke_refresh_token(db: AsyncSession, raw_token: str) -> None:
     await db.commit()
 
 
-async def revoke_all_for_user(db: AsyncSession, user_id: Any) -> None:
+async def revoke_all_for_user(db: AsyncSession, user_id: Any, except_raw_token: Optional[str] = None) -> None:
     """
-    Revoke all active refresh tokens for a user (e.g. for logout everywhere).
+    Revoke all active refresh tokens for a user (e.g. for logout everywhere),
+    optionally preserving a specific session's refresh token.
     """
     if isinstance(user_id, str):
         user_uuid = uuid.UUID(user_id)
     else:
         user_uuid = user_id
         
+    conditions = [RefreshToken.user_id == user_uuid, RefreshToken.revoked == False]
+    if except_raw_token:
+        except_hash = _hash_token(except_raw_token)
+        conditions.append(RefreshToken.token_hash != except_hash)
+
     stmt = (
         update(RefreshToken)
-        .where(RefreshToken.user_id == user_uuid, RefreshToken.revoked == False)
+        .where(*conditions)
         .values(revoked=True)
     )
     await db.execute(stmt)

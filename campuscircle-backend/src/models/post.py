@@ -20,12 +20,7 @@ class Post(Base):
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     search_vector: Mapped[str | None] = mapped_column(
-        TSVECTOR,
-        Computed(
-            "setweight(to_tsvector('english', coalesce(title, '')), 'A') || "
-            "setweight(to_tsvector('english', coalesce(content, '')), 'B')",
-            persisted=True
-        ),
+        TSVECTOR().with_variant(Text, "sqlite"),
         nullable=True
     )
 

@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.comment import Comment
+from src.models.user import User
 
 
 async def create_comment(
@@ -65,17 +66,20 @@ async def create_comment(
         recipient_id = post_res.scalar_one_or_none()
         notification_type = "reply_to_post"
 
-    # Create notification if recipient exists and is NOT the actor (never self-notify)
+    # Create notification if recipient exists, is NOT the actor, has notifications_enabled=True, and is not deleted
     if recipient_id and recipient_id != author_id:
-        notif = Notification(
-            recipient_id=recipient_id,
-            actor_id=author_id,
-            type=notification_type,
-            target_id=comment.id,
-            related_post_id=post_id
-        )
-        db.add(notif)
-        await db.flush()
+        recipient_res = await db.execute(select(User).where(User.id == recipient_id))
+        recipient_user = recipient_res.scalar_one_or_none()
+        if recipient_user and recipient_user.notifications_enabled and not recipient_user.is_deleted:
+            notif = Notification(
+                recipient_id=recipient_id,
+                actor_id=author_id,
+                type=notification_type,
+                target_id=comment.id,
+                related_post_id=post_id
+            )
+            db.add(notif)
+            await db.flush()
 
     await db.commit()
     return comment
@@ -86,8 +90,20 @@ async def get_comments_for_post(
     post_id: uuid.UUID
 ) -> List[Comment]:
     """
-    Retrieves all active comments for a given post.
+    Retrieves all active comments for a given post. If author is deleted, sets author_username to '[deleted]'.
     """
-    stmt = select(Comment).where(Comment.post_id == post_id).order_by(Comment.created_at.asc())
+    from sqlalchemy import case
+    from src.models.user import User
+
+    stmt = (
+        select(Comment, case((User.is_deleted == True, "[deleted]"), else_=User.username).label("author_username"))
+        .outerjoin(User, User.id == Comment.author_id)
+        .where(Comment.post_id == post_id)
+        .order_by(Comment.created_at.asc())
+    )
     result = await db.execute(stmt)
-    return list(result.scalars().all())
+    comments = []
+    for comment_obj, author_username in result.all():
+        setattr(comment_obj, "author_username", author_username or "[deleted]")
+        comments.append(comment_obj)
+    return comments

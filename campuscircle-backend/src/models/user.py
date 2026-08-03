@@ -33,6 +33,10 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(16), default="student", nullable=False)  # student | admin
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    last_username_change_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

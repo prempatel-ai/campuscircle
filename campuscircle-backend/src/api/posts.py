@@ -727,3 +727,43 @@ async def toggle_post_bookmark(
 
     is_bookmarked = await toggle_bookmark(db=db, user_id=user_uuid, post_id=post_uuid)
     return {"post_id": post_id, "is_bookmarked": is_bookmarked}
+
+
+@posts_router.post(
+    "/{post_id}/save",
+    status_code=status.HTTP_200_OK,
+    summary="Save/bookmark a post"
+)
+async def save_post_endpoint(
+    post_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    return await toggle_post_bookmark(post_id=post_id, current_user=current_user, db=db)
+
+
+@posts_router.delete(
+    "/{post_id}/save",
+    status_code=status.HTTP_200_OK,
+    summary="Unsave/unbookmark a post"
+)
+async def unsave_post_endpoint(
+    post_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    user_id_str = current_user["user_id"]
+    user_uuid = uuid.UUID(user_id_str)
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+
+    from src.models.bookmark import Bookmark
+    stmt = select(Bookmark).where(Bookmark.user_id == user_uuid, Bookmark.post_id == post_uuid)
+    res = await db.execute(stmt)
+    bm = res.scalar_one_or_none()
+    if bm:
+        await db.delete(bm)
+        await db.commit()
+    return {"post_id": post_id, "is_bookmarked": False}
