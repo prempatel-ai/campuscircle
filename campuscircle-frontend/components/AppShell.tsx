@@ -260,11 +260,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col pb-20 md:pb-6">{children}</main>
 
       {/* Persistent Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border-muted px-2 py-1.5 flex items-center justify-around shadow-lg">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border-muted px-2 py-1 flex items-center justify-around shadow-lg">
         <Link
           href="/feed"
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-[10px] font-sans font-bold transition-all ${
-            pathname.startsWith("/feed") ? "text-primary bg-primary/10" : "text-ink/60 hover:text-ink"
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 text-[10px] font-sans transition-all border-t-2 ${
+            pathname.startsWith("/feed")
+              ? "text-primary font-extrabold border-primary -mt-[1px]"
+              : "text-ink/60 font-semibold border-transparent"
           }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -275,8 +277,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
         <Link
           href="/learn"
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-[10px] font-sans font-bold transition-all ${
-            pathname.startsWith("/learn") ? "text-primary bg-primary/10" : "text-ink/60 hover:text-ink"
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 text-[10px] font-sans transition-all border-t-2 ${
+            pathname.startsWith("/learn")
+              ? "text-primary font-extrabold border-primary -mt-[1px]"
+              : "text-ink/60 font-semibold border-transparent"
           }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -287,8 +291,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
         <Link
           href="/ask-reva"
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-[10px] font-sans font-bold transition-all ${
-            pathname.startsWith("/ask-reva") ? "text-primary bg-primary/10" : "text-ink/60 hover:text-ink"
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 text-[10px] font-sans transition-all border-t-2 ${
+            pathname.startsWith("/ask-reva")
+              ? "text-primary font-extrabold border-primary -mt-[1px]"
+              : "text-ink/60 font-semibold border-transparent"
           }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,8 +305,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
         <Link
           href="/my-posts"
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-[10px] font-sans font-bold transition-all ${
-            pathname.startsWith("/my-posts") ? "text-primary bg-primary/10" : "text-ink/60 hover:text-ink"
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 text-[10px] font-sans transition-all border-t-2 ${
+            pathname.startsWith("/my-posts")
+              ? "text-primary font-extrabold border-primary -mt-[1px]"
+              : "text-ink/60 font-semibold border-transparent"
           }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

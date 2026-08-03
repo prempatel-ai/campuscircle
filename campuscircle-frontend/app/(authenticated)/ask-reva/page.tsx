@@ -63,6 +63,7 @@ export default function AskRevaPage() {
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [conversationsError, setConversationsError] = useState<string | null>(null);
+  const [isMobileHistoryOpen, setIsMobileHistoryOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -239,12 +240,26 @@ export default function AskRevaPage() {
       {/* 2. Center Reading Chat Column (Cols 4-9) */}
       <div className="lg:col-span-6 w-full flex flex-col items-center justify-between min-h-[calc(100vh-8rem)]">
         <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col space-y-6">
-          {/* Header */}
-          <div className="space-y-1 border-b border-border-muted/50 pb-4">
-            <h1 className="font-display text-2xl font-bold text-primary">Ask Reva AI</h1>
-            <p className="font-sans text-xs text-ink/60">
-              Campus-aware AI agent trained on university topics, course discussions, and viva prep.
-            </p>
+          {/* Header with Mobile History Drawer Trigger */}
+          <div className="flex items-center justify-between border-b border-border-muted/50 pb-4">
+            <div className="space-y-0.5">
+              <h1 className="font-display text-2xl font-bold text-primary">Ask Reva AI</h1>
+              <p className="font-sans text-xs text-ink/60">
+                Campus-aware AI agent trained on university topics, course discussions, and viva prep.
+              </p>
+            </div>
+
+            {/* Mobile History Drawer Button */}
+            <button
+              onClick={() => setIsMobileHistoryOpen(true)}
+              className="lg:hidden p-2 bg-surface-subtle border border-border-muted/70 rounded-xl text-ink/75 hover:text-primary transition-all flex items-center gap-1.5 font-sans text-xs font-bold cursor-pointer"
+              aria-label="Open chat history"
+            >
+              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>History</span>
+            </button>
           </div>
 
           {!hasStarted ? (
@@ -449,6 +464,50 @@ export default function AskRevaPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile History Slide-In Drawer Overlay */}
+      {isMobileHistoryOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          <div
+            onClick={() => setIsMobileHistoryOpen(false)}
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
+          />
+          <div className="relative z-10 w-4/5 max-w-xs bg-surface border-r border-border-muted h-full p-4 space-y-4 shadow-2xl flex flex-col animate-in slide-in-from-left duration-200">
+            <div className="flex items-center justify-between border-b border-border-muted/50 pb-3">
+              <h2 className="font-display text-base font-bold text-primary flex items-center gap-2">
+                <AnonAvatar username="reva" size={24} shape="circle" />
+                <span>Chat History</span>
+              </h2>
+              <button
+                onClick={() => setIsMobileHistoryOpen(false)}
+                className="p-1 rounded-lg text-ink/50 hover:bg-background hover:text-ink transition-all cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              <RevaChatSidebar
+                conversations={conversations}
+                activeConversationId={activeConversationId}
+                isLoading={isLoadingConversations}
+                error={conversationsError}
+                onCreateNew={() => {
+                  handleCreateConversation();
+                  setIsMobileHistoryOpen(false);
+                }}
+                onSelect={(id) => {
+                  handleSelectConversation(id);
+                  setIsMobileHistoryOpen(false);
+                }}
+                onDelete={handleDeleteConversation}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
