@@ -53,55 +53,55 @@ export const RevaChatSidebar: React.FC<RevaChatSidebarProps> = ({
   const groupOrder = ["Today", "Yesterday", "This Week", "Older"];
 
   return (
-    <div className="flex flex-col h-full space-y-3">
-      {/* New Chat Button */}
+    <div className="flex flex-col h-full space-y-4">
+      {/* Quiet Minimal New Chat Button */}
       <button
         onClick={onCreateNew}
-        className="w-full py-3 bg-primary hover:bg-[#1F3E23] active:scale-[0.99] text-white font-sans font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+        className="w-full px-3 py-2 bg-surface hover:bg-surface-subtle border border-border-muted/80 hover:border-primary/40 text-ink/80 hover:text-primary font-sans font-bold text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer shadow-2xs"
       >
-        <Plus className="w-4 h-4" />
-        <span>New Chat</span>
+        <span className="flex items-center gap-2">
+          <Plus className="w-3.5 h-3.5 text-primary" />
+          <span>New Chat</span>
+        </span>
       </button>
 
       {/* Loading State */}
       {isLoading && (
-        <div className="flex-1 flex items-center justify-center py-8">
-          <Loader2 className="w-5 h-5 text-ink/40 animate-spin" />
+        <div className="flex-1 flex items-center justify-center py-6">
+          <Loader2 className="w-4 h-4 text-ink/30 animate-spin" />
         </div>
       )}
 
       {/* Error State */}
       {!isLoading && error && (
-        <div className="flex-1 flex flex-col items-center justify-center py-6 px-3 text-center space-y-2">
-          <p className="text-xs font-sans text-red-600">{error}</p>
+        <div className="py-4 px-2 text-center space-y-1">
+          <p className="text-[11px] font-sans text-red-600">{error}</p>
           <button
             onClick={onCreateNew}
-            className="text-xs font-sans font-bold text-primary hover:underline cursor-pointer"
+            className="text-[11px] font-sans font-bold text-primary hover:underline cursor-pointer"
           >
-            Start a new chat
+            Retry
           </button>
         </div>
       )}
 
       {/* Empty State */}
       {!isLoading && !error && conversations.length === 0 && (
-        <div className="flex-1 flex flex-col items-center justify-center py-10 px-3 text-center space-y-2">
-          <MessageSquare className="w-6 h-6 text-ink/30 mx-auto" />
-          <p className="text-xs font-sans text-ink/50 font-medium">
-            No past conversations
-          </p>
+        <div className="py-8 px-2 text-center space-y-1">
+          <MessageSquare className="w-5 h-5 text-ink/20 mx-auto" />
+          <p className="text-[11px] font-sans text-ink/40">No conversations</p>
         </div>
       )}
 
-      {/* Conversation List */}
+      {/* Minimal Conversation List */}
       {!isLoading && !error && conversations.length > 0 && (
         <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[calc(100vh-14rem)]">
           {groupOrder.map((group) => {
             const items = grouped[group];
             if (!items) return null;
             return (
-              <div key={group} className="space-y-1">
-                <div className="px-2 py-1 text-[10px] font-mono font-bold text-ink/40 uppercase tracking-wider">
+              <div key={group} className="space-y-0.5">
+                <div className="px-2 py-0.5 text-[10px] font-mono font-bold text-ink/40 uppercase tracking-wider">
                   {group}
                 </div>
                 {items.map((conv) => {
@@ -109,15 +109,15 @@ export const RevaChatSidebar: React.FC<RevaChatSidebarProps> = ({
                   return (
                     <div
                       key={conv.id}
-                      className={`group relative flex items-center rounded-xl transition-all cursor-pointer ${
+                      className={`group relative flex items-center rounded-lg transition-all cursor-pointer ${
                         isActive
-                          ? "bg-primary text-white font-bold shadow-sm"
-                          : "text-ink/75 font-semibold hover:bg-background hover:text-ink"
+                          ? "bg-primary/10 text-primary font-bold"
+                          : "text-ink/65 font-medium hover:bg-surface-subtle hover:text-ink"
                       }`}
                     >
                       <button
                         onClick={() => onSelect(conv.id)}
-                        className="flex-1 text-left px-3 py-2 min-w-0"
+                        className="flex-1 text-left px-2.5 py-1.5 min-w-0"
                       >
                         <span className="block text-xs font-sans truncate">
                           {conv.title}
@@ -128,14 +128,14 @@ export const RevaChatSidebar: React.FC<RevaChatSidebarProps> = ({
                           e.stopPropagation();
                           onDelete(conv.id);
                         }}
-                        className={`absolute right-1.5 p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer ${
+                        className={`absolute right-1 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer ${
                           isActive
-                            ? "hover:bg-white/20 text-white"
+                            ? "hover:bg-primary/20 text-primary"
                             : "hover:bg-red-100 hover:text-red-600 text-ink/40"
                         }`}
                         aria-label="Delete conversation"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   );

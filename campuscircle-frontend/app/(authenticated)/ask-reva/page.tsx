@@ -30,10 +30,10 @@ interface ChatMessage {
 }
 
 const CATEGORY_CHIPS = [
-  { label: "Code Debugging", category: "code", prompt: "Help me debug my code or explain an algorithm concept." },
+  { label: "Code Debugging", category: "code", prompt: "Help me debug my C++ code or explain an algorithm concept." },
   { label: "Campus Discussions", category: "feed", prompt: "What are the latest discussions and posts trending on campus today?" },
-  { label: "Concept Explanation", category: "learn", prompt: "Can you explain a complex subject like DBMS SQL Joins or System Design in simple terms?" },
-  { label: "Viva Prep", category: "viva", prompt: "Give me top 5 viva questions and model answers for Database Management Systems." },
+  { label: "DBMS & SQL Prep", category: "learn", prompt: "Can you explain SQL Joins or DBMS concepts for viva prep?" },
+  { label: "Viva Questions", category: "viva", prompt: "Give me top 5 viva questions and model answers for Operating Systems." },
 ];
 
 function formatTimestamp(dateStr: string): string {
@@ -221,51 +221,10 @@ export default function AskRevaPage() {
   const username = user?.username || "student";
   const hasStarted = messages.length > 0 || activeConversationId !== null;
 
-  const renderInputCard = () => (
-    <div className="bg-surface border border-border-muted rounded-2xl p-4 space-y-3 shadow-2xs">
-      <textarea
-        rows={3}
-        value={inputText}
-        onChange={(e) => setInputText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
-          }
-        }}
-        placeholder="Ask Reva about campus discussions, code debugging, or exam prep..."
-        className="w-full bg-background border border-border-muted/80 rounded-xl p-3 text-sm text-ink placeholder:text-ink/40 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 resize-none font-sans transition-all"
-      />
-
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => setModelMode(modelMode === "fast" ? "thinking" : "fast")}
-          className="px-3.5 py-1.5 bg-background border border-border-muted hover:border-primary/40 rounded-full text-xs font-mono font-bold text-ink/75 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-        >
-          <span className="w-2 h-2 rounded-full bg-primary" />
-          <span>{modelMode === "fast" ? "Fast Model" : "Deep Think"}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleSendMessage()}
-          disabled={!inputText.trim() || isSending}
-          className="px-5 py-2 bg-primary hover:bg-[#1F3E23] text-surface font-sans font-bold text-xs rounded-xl shadow-md transition-all disabled:opacity-30 cursor-pointer flex items-center gap-2"
-        >
-          <span>Send</span>
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="flex-1 text-ink font-sans grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 py-6 items-start">
-      {/* 1. Left Sidebar Column */}
-      <div className="lg:col-span-3 lg:sticky lg:top-20 bg-surface-subtle border border-border-muted/70 rounded-2xl p-4 shadow-2xs">
+    <div className="flex-1 text-ink font-sans grid grid-cols-1 lg:grid-cols-12 gap-6 py-4 items-start min-h-[calc(100vh-6rem)]">
+      {/* 1. Left Conversation Sidebar (Quiet & Understated) */}
+      <div className="hidden lg:block lg:col-span-3 lg:sticky lg:top-20 pr-2">
         <RevaChatSidebar
           conversations={conversations}
           activeConversationId={activeConversationId}
@@ -277,46 +236,48 @@ export default function AskRevaPage() {
         />
       </div>
 
-      {/* 2. Main Center Chat Column */}
-      <div className="lg:col-span-9 w-full flex flex-col space-y-6">
-        {/* Standard Left-Aligned Header Banner (matches Learn, Settings, My Activity) */}
-        <div className="space-y-1 border-b border-border-muted pb-5">
-          <h1 className="font-display text-3xl font-bold text-primary">Ask Reva AI</h1>
-          <p className="font-sans text-sm text-ink/75">
-            Campus-aware AI agent trained on university topics, course discussions, and viva prep.
-          </p>
-        </div>
+      {/* 2. Main Open Chat Area (Centered 700-800px Reading Column) */}
+      <div className="lg:col-span-9 w-full flex flex-col items-center justify-between min-h-[calc(100vh-7rem)]">
+        <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col space-y-6">
+          {/* Header */}
+          <div className="space-y-1 border-b border-border-muted/50 pb-4">
+            <h1 className="font-display text-2xl font-bold text-primary">Ask Reva AI</h1>
+            <p className="font-sans text-xs text-ink/60">
+              Campus-aware AI agent trained on university topics, course discussions, and viva prep.
+            </p>
+          </div>
 
-        {!hasStarted ? (
-          /* INITIAL CHAT PROMPT STATE */
-          <div className="space-y-6">
-            {/* Input Card */}
-            {renderInputCard()}
+          {!hasStarted ? (
+            /* INITIAL OPEN STATE */
+            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 py-12">
+              <div className="space-y-2">
+                <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-2">
+                  <AnonAvatar username="reva" size={40} shape="circle" />
+                </div>
+                <h2 className="font-display text-xl font-bold text-ink">What can I help you with today?</h2>
+                <p className="font-sans text-xs text-ink/60 max-w-md mx-auto">
+                  Ask about code issues, campus feed posts, exam concepts, or tag @reva in any discussion.
+                </p>
+              </div>
 
-            {/* Suggestion Pills matching Community Tabs styling */}
-            <div className="space-y-2">
-              <h3 className="font-mono text-xs font-bold text-ink/40 uppercase tracking-wider px-1">
-                Suggested Topics
-              </h3>
-              <div className="flex flex-wrap gap-2">
+              {/* Minimal Suggestion Pills */}
+              <div className="flex flex-wrap items-center justify-center gap-2 max-w-lg pt-2">
                 {CATEGORY_CHIPS.map((chip) => (
                   <button
                     key={chip.category}
                     onClick={() => handleSendMessage(chip.prompt)}
-                    className="px-4 py-1.5 rounded-full text-xs font-sans font-semibold tracking-tight whitespace-nowrap bg-surface text-ink/75 border border-border-muted hover:bg-background hover:text-primary hover:border-primary/40 transition-all duration-200 cursor-pointer shadow-2xs"
+                    className="px-3.5 py-1.5 rounded-full text-xs font-sans font-medium bg-surface text-ink/75 border border-border-muted/60 hover:border-primary/40 hover:text-primary transition-all shadow-2xs cursor-pointer"
                   >
                     {chip.label}
                   </button>
                 ))}
               </div>
             </div>
-          </div>
-        ) : (
-          /* ACTIVE CONVERSATION MESSAGES STATE */
-          <div className="flex flex-col space-y-4">
-            <div className="bg-surface border border-border-muted rounded-2xl p-4 sm:p-6 space-y-5 shadow-2xs min-h-[400px] max-h-[600px] overflow-y-auto">
+          ) : (
+            /* ACTIVE OPEN CHAT MESSAGES STREAM */
+            <div className="flex-1 space-y-6 pb-24">
               {isLoadingMessages ? (
-                <div className="flex items-center justify-center py-12">
+                <div className="flex items-center justify-center py-16">
                   <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : (
@@ -327,31 +288,31 @@ export default function AskRevaPage() {
                     return (
                       <div
                         key={msg.id}
-                        className={`flex items-start gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+                        className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
                       >
-                        {isUser ? (
-                          <AnonAvatar username={username} size={36} shape="circle" />
-                        ) : (
-                          <AnonAvatar username="reva" size={36} shape="circle" />
+                        {!isUser && (
+                          <div className="shrink-0 mt-0.5">
+                            <AnonAvatar username="reva" size={32} shape="circle" />
+                          </div>
                         )}
 
                         <div
-                          className={`max-w-[82%] sm:max-w-[75%] rounded-2xl p-4 space-y-1 text-xs sm:text-sm font-sans ${
+                          className={`space-y-1 text-xs sm:text-sm font-sans ${
                             isUser
-                              ? "bg-primary text-surface rounded-tr-xs shadow-xs"
-                              : "bg-background border border-border-muted text-ink rounded-tl-xs"
+                              ? "bg-surface border border-border-muted/60 text-ink rounded-2xl rounded-tr-xs p-4 shadow-2xs max-w-[85%] sm:max-w-[78%]"
+                              : "text-ink max-w-full leading-relaxed py-1"
                           }`}
                         >
-                          <div className="flex items-center justify-between gap-4 border-b border-current/10 pb-1 mb-1 opacity-80">
-                            <span className="font-mono text-[11px] font-bold uppercase">
-                              {isUser ? `@${username}` : "@reva"}
-                            </span>
-                            <span className="text-[10px] font-mono opacity-60">{msg.timestamp}</span>
+                          <div className="flex items-center gap-2 opacity-60 text-[10px] font-mono mb-1">
+                            <span className="font-bold uppercase">{isUser ? `@${username}` : "Reva AI"}</span>
+                            <span>•</span>
+                            <span>{msg.timestamp}</span>
                           </div>
+
                           {isUser ? (
-                            <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                            <p className="whitespace-pre-wrap">{msg.text}</p>
                           ) : (
-                            <div className="leading-relaxed [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-2 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:mb-2 [&>h3]:font-bold [&>h3]:text-sm [&>h3]:mt-3 [&>h3]:mb-1.5 [&>h4]:font-bold [&>h4]:text-xs [&>h4]:mt-2 [&>h4]:mb-1 [&>strong]:font-bold [&>a]:text-primary [&>a]:underline [&>pre]:mb-2 [&>hr]:my-2">
+                            <div className="leading-relaxed [&>p]:mb-3 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-3 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:mb-3 [&>h3]:font-bold [&>h3]:text-sm [&>h3]:mt-4 [&>h3]:mb-1.5 [&>strong]:font-bold [&>a]:text-primary [&>a]:underline [&>pre]:mb-3 [&>hr]:my-3">
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
@@ -360,7 +321,7 @@ export default function AskRevaPage() {
                                     return isInline ? (
                                       <code className="bg-ink/10 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
                                     ) : (
-                                      <pre className="bg-ink/5 p-3 rounded-xl overflow-x-auto mb-3 text-xs">
+                                      <pre className="bg-surface border border-border-muted p-3.5 rounded-xl overflow-x-auto my-2 text-xs font-mono">
                                         <code className={className} {...props}>{children}</code>
                                       </pre>
                                     );
@@ -372,18 +333,24 @@ export default function AskRevaPage() {
                             </div>
                           )}
                         </div>
+
+                        {isUser && (
+                          <div className="shrink-0 mt-0.5">
+                            <AnonAvatar username={username} size={32} shape="circle" />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
 
                   {isSending && (
-                    <div className="flex items-center gap-3">
-                      <AnonAvatar username="reva" size={36} shape="circle" />
-                      <div className="bg-background border border-border-muted rounded-2xl rounded-tl-xs px-4 py-3 text-xs font-sans text-ink/75 flex items-center gap-2">
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.2s]" />
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.4s]" />
-                        <span className="font-mono text-[11px] text-ink/60 ml-1">Reva is thinking...</span>
+                    <div className="flex items-center gap-3 py-2">
+                      <AnonAvatar username="reva" size={32} shape="circle" />
+                      <div className="text-xs font-sans text-ink/60 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0.2s]" />
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0.4s]" />
+                        <span className="font-mono text-[11px]">Thinking...</span>
                       </div>
                     </div>
                   )}
@@ -392,16 +359,54 @@ export default function AskRevaPage() {
                 </>
               )}
             </div>
+          )}
+        </div>
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs font-sans text-red-700">
-                {error}
-              </div>
-            )}
+        {/* 3. Floating Pill-Shaped Input Bar (Sticky at Bottom) */}
+        <div className="sticky bottom-4 w-full max-w-2xl mx-auto pt-2 bg-background/80 backdrop-blur-md">
+          {error && (
+            <div className="mb-2 p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs font-sans text-red-700">
+              {error}
+            </div>
+          )}
 
-            {renderInputCard()}
+          <div className="bg-surface border border-border-muted/80 rounded-full px-4 py-2 shadow-lg flex items-center gap-3 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+            <textarea
+              rows={1}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder="Ask Reva anything..."
+              className="flex-1 bg-transparent text-xs sm:text-sm text-ink placeholder:text-ink/40 outline-none border-none resize-none font-sans py-1 max-h-24"
+            />
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setModelMode(modelMode === "fast" ? "thinking" : "fast")}
+                className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border border-border-muted/60 text-ink/70 hover:text-primary hover:border-primary/40 transition-all"
+              >
+                {modelMode === "fast" ? "Fast" : "Deep Think"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSendMessage()}
+                disabled={!inputText.trim() || isSending}
+                className="w-8 h-8 bg-primary hover:bg-[#1F3E23] text-surface rounded-full flex items-center justify-center transition-all disabled:opacity-30 cursor-pointer shadow-xs"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
