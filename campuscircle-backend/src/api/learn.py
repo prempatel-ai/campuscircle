@@ -45,7 +45,9 @@ from src.schemas.learn import (
     UserConceptGapOut,
     UserGapsResponse,
     StudentLearningProfileOut,
-    CareerGoalUpdatePayload
+    CareerGoalUpdatePayload,
+    PreSessionMentorOut,
+    PostSessionMentorOut
 )
 from src.services.learning_profile_service import (
     get_or_create_learning_profile,
@@ -56,6 +58,10 @@ from src.services.learning_profile_service import (
 from src.services.learning_memory_service import (
     create_or_update_memory_from_session,
     get_relevant_memories_for_topic
+)
+from src.services.ai_mentor_service import (
+    generate_presession_mentor_guidance,
+    generate_postsession_mentor_summary
 )
 
 router = APIRouter(prefix="/learn", tags=["learn"])
@@ -1067,5 +1073,35 @@ async def patch_my_career_goal(
     user_uuid = uuid.UUID(current_user["user_id"])
     profile = await update_career_goal(db=db, user_id=user_uuid, career_goal=payload.career_goal)
     return profile
+
+
+@router.get(
+    "/me/mentor/pre-session",
+    response_model=PreSessionMentorOut,
+    status_code=status.HTTP_200_OK,
+    summary="Get personalized pre-session guidance from Reva AI Mentor"
+)
+async def get_presession_mentor_guidance(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user_uuid = uuid.UUID(current_user["user_id"])
+    return await generate_presession_mentor_guidance(db=db, user_id=user_uuid)
+
+
+@router.post(
+    "/{session_id}/mentor/post-session",
+    response_model=PostSessionMentorOut,
+    status_code=status.HTTP_200_OK,
+    summary="Get personalized post-session feedback summary from Reva AI Mentor"
+)
+async def get_postsession_mentor_summary(
+    session_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user_uuid = uuid.UUID(current_user["user_id"])
+    return await generate_postsession_mentor_summary(db=db, user_id=user_uuid, session_id=session_id)
+
 
 

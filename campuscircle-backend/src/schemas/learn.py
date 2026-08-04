@@ -154,3 +154,19 @@ class CareerGoalUpdatePayload(BaseModel):
     career_goal: str = Field(..., max_length=100, description="Selected career learning goal")
 
 
+class PreSessionMentorOut(BaseModel):
+    greeting: str
+    mentor_message: str
+    suggested_next_topic: Optional[str] = None
+    career_goal: Optional[str] = None
+    streak_days: int = 0
+
+
+class PostSessionMentorOut(BaseModel):
+    summary_message: str
+    strengths: List[str] = Field(default_factory=list)
+    needs_practice: List[str] = Field(default_factory=list)
+    suggested_next_topic: Optional[str] = None
+
+
+
