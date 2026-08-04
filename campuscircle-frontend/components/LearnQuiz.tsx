@@ -321,7 +321,9 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
         <div className="bg-gradient-to-r from-primary/10 via-surface to-primary/5 border border-primary/20 rounded-2xl p-6 space-y-4 shadow-2xs animate-in fade-in duration-200">
           <div className="flex items-center gap-2 border-b border-primary/10 pb-3">
             <span className="w-7 h-7 rounded-full bg-primary text-surface font-mono font-bold text-xs flex items-center justify-center shadow-xs">
-              🤖
+              <svg className="w-4 h-4 text-surface" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
             </span>
             <h3 className="font-display text-base font-bold text-primary">
               Reva Mentor Feedback

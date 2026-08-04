@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { apiRequest, ApiError } from "@/lib/api";
 import { PostCard } from "@/components/PostCard";
@@ -32,15 +33,34 @@ interface PaginatedResponse<T> {
 
 type TabType = "posts" | "saved" | "commented";
 
-export default function MyPostsPage() {
+function MyPostsContent() {
   const { isAuthenticated, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>("posts");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const tabFromUrl = (searchParams.get("tab") as TabType) || "posts";
+  const [activeTab, setActiveTab] = useState<TabType>(
+    ["posts", "saved", "commented"].includes(tabFromUrl) ? tabFromUrl : "posts"
+  );
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync state with URL query param changes
+  useEffect(() => {
+    const currentParam = searchParams.get("tab") as TabType;
+    if (currentParam && ["posts", "saved", "commented"].includes(currentParam)) {
+      setActiveTab(currentParam);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab: TabType) => {
+    setActiveTab(newTab);
+    router.replace(`/my-posts?tab=${newTab}`, { scroll: false });
+  };
 
   const fetchTabData = useCallback(
     async (tab: TabType, currentPage: number, append = false) => {
@@ -101,7 +121,7 @@ export default function MyPostsPage() {
           </h3>
           <div className="flex flex-col gap-1.5 font-sans text-xs font-semibold">
             <button
-              onClick={() => setActiveTab("posts")}
+              onClick={() => handleTabChange("posts")}
               className={`w-full text-left px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "posts"
                   ? "bg-primary text-white font-bold shadow-xs"
@@ -115,7 +135,7 @@ export default function MyPostsPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab("saved")}
+              onClick={() => handleTabChange("saved")}
               className={`w-full text-left px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "saved"
                   ? "bg-primary text-white font-bold shadow-xs"
@@ -129,7 +149,7 @@ export default function MyPostsPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab("commented")}
+              onClick={() => handleTabChange("commented")}
               className={`w-full text-left px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "commented"
                   ? "bg-primary text-white font-bold shadow-xs"
@@ -158,7 +178,7 @@ export default function MyPostsPage() {
         {/* 3 Activity Tabs for Mobile */}
         <div className="lg:hidden flex items-center gap-2 border-b border-border-muted pb-3">
           <button
-            onClick={() => setActiveTab("posts")}
+            onClick={() => handleTabChange("posts")}
             className={`px-3 py-1.5 rounded-xl text-xs font-sans font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === "posts"
                 ? "bg-primary text-surface shadow-xs"
@@ -168,7 +188,7 @@ export default function MyPostsPage() {
             <span>Posts</span>
           </button>
           <button
-            onClick={() => setActiveTab("saved")}
+            onClick={() => handleTabChange("saved")}
             className={`px-3 py-1.5 rounded-xl text-xs font-sans font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === "saved"
                 ? "bg-primary text-surface shadow-xs"
@@ -178,7 +198,7 @@ export default function MyPostsPage() {
             <span>Saved</span>
           </button>
           <button
-            onClick={() => setActiveTab("commented")}
+            onClick={() => handleTabChange("commented")}
             className={`px-3 py-1.5 rounded-xl text-xs font-sans font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === "commented"
                 ? "bg-primary text-surface shadow-xs"
@@ -212,7 +232,14 @@ export default function MyPostsPage() {
               ))}
             </div>
           ) : (
-            posts.map((post) => <PostCard key={post.id} post={post} showAuthorViewCount={true} />)
+            posts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                showAuthorViewCount={true}
+                initialBookmarked={activeTab === "saved"}
+              />
+            ))
           )}
 
           {/* Empty State */}
@@ -297,5 +324,13 @@ export default function MyPostsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MyPostsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs font-sans text-ink/60">Loading activity...</div>}>
+      <MyPostsContent />
+    </Suspense>
   );
 }

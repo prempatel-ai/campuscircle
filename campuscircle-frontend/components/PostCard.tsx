@@ -26,6 +26,7 @@ interface Post {
 interface PostCardProps {
   post: Post;
   showAuthorViewCount?: boolean;
+  initialBookmarked?: boolean;
 }
 
 // Relative time formatter
@@ -82,10 +83,14 @@ function getEstimatedViews(postId: string, score: number, commentCount: number):
   return base + Math.abs(score) * 12 + commentCount * 18;
 }
 
-export const PostCard: React.FC<PostCardProps> = ({ post, showAuthorViewCount = false }) => {
+export const PostCard: React.FC<PostCardProps> = ({
+  post,
+  showAuthorViewCount = false,
+  initialBookmarked = false,
+}) => {
   const relativeTime = getRelativeTime(post.created_at);
   const [reporting, setReporting] = useState(false);
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(initialBookmarked);
 
   const isThread = post.thread_total_parts && post.thread_total_parts > 1;
   const estimatedViews = getEstimatedViews(post.id, post.score, post.comment_count);

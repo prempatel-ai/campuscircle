@@ -51,16 +51,77 @@ interface PreSessionMentor {
 }
 
 const CAREER_GOALS = [
-  { id: "Placement Preparation", label: "Placement Preparation", icon: "💼", desc: "Coding interviews, DS/Algo, time complexity" },
-  { id: "AI / Machine Learning", label: "AI / Machine Learning", icon: "🤖", desc: "ML models, neural nets, math, vector spaces" },
-  { id: "Data Science", label: "Data Science", icon: "📊", desc: "Data analysis, SQL, statistics, visualization" },
-  { id: "Web Development", label: "Web Development", icon: "🌐", desc: "Frontend, backend, APIs, system architecture" },
-  { id: "Mobile Development", label: "Mobile Development", icon: "📱", desc: "iOS, Android, cross-platform apps, UI/UX" },
-  { id: "Competitive Programming", label: "Competitive Programming", icon: "⚡", desc: "Fast problem solving, edge cases, algorithms" },
-  { id: "GATE", label: "GATE Exam", icon: "🎓", desc: "Core CS theory, formulas, exam problems" },
-  { id: "Research", label: "Academic Research", icon: "🔬", desc: "Papers, deep theory, mathematical proofs" },
-  { id: "Other", label: "General Learning", icon: "🚀", desc: "Comprehensive foundational understanding" },
+  { id: "Placement Preparation", label: "Placement Preparation", iconType: "briefcase", desc: "Coding interviews, DS/Algo, time complexity" },
+  { id: "AI / Machine Learning", label: "AI / Machine Learning", iconType: "cpu", desc: "ML models, neural nets, math, vector spaces" },
+  { id: "Data Science", label: "Data Science", iconType: "chart", desc: "Data analysis, SQL, statistics, visualization" },
+  { id: "Web Development", label: "Web Development", iconType: "globe", desc: "Frontend, backend, APIs, system architecture" },
+  { id: "Mobile Development", label: "Mobile Development", iconType: "phone", desc: "iOS, Android, cross-platform apps, UI/UX" },
+  { id: "Competitive Programming", label: "Competitive Programming", iconType: "zap", desc: "Fast problem solving, edge cases, algorithms" },
+  { id: "GATE", label: "GATE Exam", iconType: "academic", desc: "Core CS theory, formulas, exam problems" },
+  { id: "Research", label: "Academic Research", iconType: "beaker", desc: "Papers, deep theory, mathematical proofs" },
+  { id: "Other", label: "General Learning", iconType: "compass", desc: "Comprehensive foundational understanding" },
 ];
+
+function renderGoalIcon(type: string) {
+  const className = "w-5 h-5 text-primary shrink-0 mt-0.5";
+  switch (type) {
+    case "briefcase":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      );
+    case "cpu":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M3 9h2m-2 6h2m14-6h2m-2 6h2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+        </svg>
+      );
+    case "chart":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      );
+    case "globe":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 014 9 15.3 15.3 0 01-4 9 15.3 15.3 0 01-4-9 15.3 15.3 0 014-9z" />
+        </svg>
+      );
+    case "phone":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+      );
+    case "zap":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      );
+    case "academic":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+        </svg>
+      );
+    case "beaker":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L5.605 15.12a2 2 0 00-1.8 1.18l-1.2 2.7A2 2 0 004.414 21.8h15.172a2 2 0 001.809-2.8l-1.967-3.572z" />
+        </svg>
+      );
+    default:
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        </svg>
+      );
+  }
+}
 
 const SAMPLE_VIDEOS = [
   {
@@ -82,11 +143,11 @@ const SAMPLE_VIDEOS = [
 ];
 
 const LANGUAGES = [
-  { code: "en", label: "English", flag: "🇺🇸" },
-  { code: "hi", label: "Hindi (हिंदी)", flag: "🇮🇳" },
-  { code: "es", label: "Spanish (Español)", flag: "🇪🇸" },
-  { code: "fr", label: "French (Français)", flag: "🇫🇷" },
-  { code: "gu", label: "Gujarati (ગુજરાતી)", flag: "🇮🇳" },
+  { code: "en", label: "English", tag: "EN" },
+  { code: "hi", label: "Hindi (हिंदी)", tag: "HI" },
+  { code: "es", label: "Spanish (Español)", tag: "ES" },
+  { code: "fr", label: "French (Français)", tag: "FR" },
+  { code: "gu", label: "Gujarati (ગુજરાતી)", tag: "GU" },
 ];
 
 export default function LearnPage() {
@@ -277,15 +338,20 @@ export default function LearnPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-full bg-primary text-surface font-mono font-bold text-xs flex items-center justify-center shadow-xs">
-                      🤖
+                      <svg className="w-4 h-4 text-surface" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
                     </span>
                     <span className="font-display text-sm font-bold text-primary">
                       {mentorGuidance.greeting}
                     </span>
                   </div>
                   {mentorGuidance.streak_days > 0 && (
-                    <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 font-mono text-[10px] font-bold rounded-full border border-amber-200">
-                      🔥 {mentorGuidance.streak_days} Day Streak
+                    <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 font-mono text-[10px] font-bold rounded-full border border-amber-200 flex items-center gap-1">
+                      <svg className="w-3 h-3 text-amber-600" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 23c-5.52 0-10-4.48-10-10 0-4.59 3.09-8.46 7.35-9.62.48-.13.96.22.96.72 0 .34-.21.64-.52.76C7.03 5.92 5 8.71 5 12c0 3.87 3.13 7 7 7s7-3.13 7-7c0-1.89-.75-3.6-1.97-4.88-.26-.27-.24-.7.04-.95.27-.24.69-.22.94.05C19.34 7.6 20 9.71 20 12c0 5.52-4.48 10-10 10z"/>
+                      </svg>
+                      <span>{mentorGuidance.streak_days} Day Streak</span>
                     </span>
                   )}
                 </div>
@@ -541,7 +607,7 @@ export default function LearnPage() {
                         : "bg-background border-border-muted/80 text-ink hover:border-primary/50 hover:bg-surface"
                     }`}
                   >
-                    <span className="text-xl shrink-0 mt-0.5">{goal.icon}</span>
+                    {renderGoalIcon(goal.iconType)}
                     <div className="space-y-0.5 min-w-0">
                       <p className="font-sans text-xs font-bold truncate">{goal.label}</p>
                       <p className="font-sans text-[11px] text-ink/60 leading-snug line-clamp-2">{goal.desc}</p>
