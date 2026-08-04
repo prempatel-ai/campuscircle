@@ -17,8 +17,9 @@ from src.models.bookmark import Bookmark
 from src.models.tag import Tag, post_tags
 from src.models.learn import LearnExtractionLog
 from src.models.learning_session import LearningSession
-from src.models.conversation import Conversation
-from src.models.chat_message import ChatMessage
+from src.models.student_learning_profile import StudentLearningProfile
+from src.models.user_learning_memory import UserLearningMemory
+from src.models.lesson_chat_message import LessonChatMessage
 
 __all__ = [
     "University",
@@ -38,4 +39,7 @@ __all__ = [
     "LearningSession",
     "Conversation",
     "ChatMessage",
+    "StudentLearningProfile",
+    "UserLearningMemory",
+    "LessonChatMessage",
 ]

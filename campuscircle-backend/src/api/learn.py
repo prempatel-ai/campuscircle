@@ -47,7 +47,9 @@ from src.schemas.learn import (
     StudentLearningProfileOut,
     CareerGoalUpdatePayload,
     PreSessionMentorOut,
-    PostSessionMentorOut
+    PostSessionMentorOut,
+    LessonChatSendIn,
+    LessonChatMessageOut
 )
 from src.services.learning_profile_service import (
     get_or_create_learning_profile,
@@ -1102,6 +1104,51 @@ async def get_postsession_mentor_summary(
 ):
     user_uuid = uuid.UUID(current_user["user_id"])
     return await generate_postsession_mentor_summary(db=db, user_id=user_uuid, session_id=session_id)
+
+
+@router.get(
+    "/{session_id}/chat/messages",
+    response_model=List[LessonChatMessageOut],
+    status_code=status.HTTP_200_OK,
+    summary="Get chat history for active lesson"
+)
+async def get_lesson_chat_history(
+    session_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    user_uuid = uuid.UUID(current_user["user_id"])
+    from src.services.lesson_chat_service import get_lesson_chat_messages
+    try:
+        return await get_lesson_chat_messages(db=db, session_id=session_id, user_id=user_uuid)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post(
+    "/{session_id}/chat/messages",
+    response_model=LessonChatMessageOut,
+    status_code=status.HTTP_200_OK,
+    summary="Send follow-up question in active lesson chat"
+)
+async def send_lesson_chat_followup(
+    session_id: uuid.UUID,
+    payload: LessonChatSendIn,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    user_uuid = uuid.UUID(current_user["user_id"])
+    from src.services.lesson_chat_service import post_lesson_chat_message
+    try:
+        return await post_lesson_chat_message(
+            db=db,
+            session_id=session_id,
+            user_id=user_uuid,
+            user_text=payload.message
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
 
 
 

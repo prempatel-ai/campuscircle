@@ -169,4 +169,20 @@ class PostSessionMentorOut(BaseModel):
     suggested_next_topic: Optional[str] = None
 
 
+class LessonChatSendIn(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000, description="Follow-up question or message from student")
+
+
+class LessonChatMessageOut(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    sender: str
+    content: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+
 

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { ExplanationChunks } from "@/components/ExplanationChunks";
 import { LearnQuiz } from "@/components/LearnQuiz";
+import { LessonChat } from "@/components/LessonChat";
 import { apiRequest, ApiError } from "@/lib/api";
 
 interface Chunk {
@@ -538,15 +539,29 @@ export default function LearnPage() {
             dailyRemaining={explainData.daily_explanations_remaining}
             onStartQuiz={() => setViewState("quiz")}
           />
+
+          {/* Interactive Lesson Chat */}
+          <LessonChat
+            sessionId={explainData.session_id}
+            lessonTitle={explainData.video_title}
+          />
         </div>
       )}
 
       {/* 4. QUIZ STATE */}
       {viewState === "quiz" && explainData && (
-        <LearnQuiz
-          sessionId={explainData.session_id}
-          onBackToExplanation={() => setViewState("explanation")}
-        />
+        <div className="space-y-6">
+          <LearnQuiz
+            sessionId={explainData.session_id}
+            onBackToExplanation={() => setViewState("explanation")}
+          />
+
+          {/* Interactive Lesson Chat */}
+          <LessonChat
+            sessionId={explainData.session_id}
+            lessonTitle={explainData.video_title}
+          />
+        </div>
       )}
       </div>
 
@@ -580,8 +595,9 @@ export default function LearnPage() {
       {/* Onboarding & Goal Selector Modal */}
       {showGoalModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-surface border border-border-muted rounded-3xl p-6 sm:p-8 max-w-xl w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="space-y-2 text-center sm:text-left border-b border-border-muted/50 pb-4">
+          <div className="bg-surface border border-border-muted rounded-3xl max-w-xl w-full shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh] [scrollbar-width:thin] [scrollbar-color:#2F523340_transparent] flex flex-col">
+            {/* Sticky header */}
+            <div className="sticky top-0 z-10 bg-surface rounded-t-3xl px-6 sm:px-8 pt-6 sm:pt-8 pb-4 border-b border-border-muted/50 space-y-2 text-center sm:text-left">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full font-mono text-[11px] font-bold">
                 <span>Personalized Learning Context</span>
               </div>
@@ -593,7 +609,8 @@ export default function LearnPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[340px] overflow-y-auto pr-1">
+            <div className="px-6 sm:px-8 py-5 flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {CAREER_GOALS.map((goal) => {
                 const isSelected = profile?.career_goal === goal.id;
                 return (
@@ -616,9 +633,11 @@ export default function LearnPage() {
                 );
               })}
             </div>
+            </div>
 
+            {/* Sticky footer */}
             {profile?.career_goal && (
-              <div className="flex justify-end pt-2 border-t border-border-muted/50">
+              <div className="sticky bottom-0 z-10 bg-surface rounded-b-3xl px-6 sm:px-8 py-4 border-t border-border-muted/50 flex justify-end">
                 <button
                   type="button"
                   onClick={() => setShowGoalModal(false)}
