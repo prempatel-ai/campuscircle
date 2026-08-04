@@ -53,6 +53,10 @@ from src.services.learning_profile_service import (
     update_profile_on_quiz_submission,
     update_career_goal
 )
+from src.services.learning_memory_service import (
+    create_or_update_memory_from_session,
+    get_relevant_memories_for_topic
+)
 
 router = APIRouter(prefix="/learn", tags=["learn"])
 
@@ -326,7 +330,8 @@ _MOCK_CHUNKS = [
 async def call_groq_api_for_explanation(
     transcript_text: str,
     language_name: str = "English",
-    career_goal: Optional[str] = None
+    career_goal: Optional[str] = None,
+    previous_memories: Optional[List[str]] = None
 ) -> List[dict]:
     if not settings.groq_api_key:
         return _MOCK_CHUNKS
@@ -338,10 +343,19 @@ async def call_groq_api_for_explanation(
         if career_goal else ""
     )
 
+    memory_prompt = ""
+    if previous_memories and len(previous_memories) > 0:
+        memories_joined = "; ".join(previous_memories)
+        memory_prompt = (
+            f" The student has previously studied related topics: [{memories_joined}]. "
+            "Where relevant and natural, connect concepts from these prior lessons to help the student "
+            "build upon their existing foundation without forcing artificial references."
+        )
+
     system_prompt = (
         "You are an expert AI educator. Break down the provided video transcript into "
         "digestible, storytelling-style explanation chunks for a first-time learner. "
-        f"You MUST write all titles and explanations directly in {language_name}.{goal_prompt} "
+        f"You MUST write all titles and explanations directly in {language_name}.{goal_prompt}{memory_prompt} "
         "Return a JSON object with a single top-level key 'chunks' — a list where each item "
         "has exactly two string keys: 'title' and 'explanation'."
     )
@@ -651,10 +665,18 @@ async def explain_youtube_transcript(
             raise HTTPException(404, "This video is unavailable.")
 
     profile = await get_or_create_learning_profile(db=db, user_id=user_uuid)
+    previous_memories = await get_relevant_memories_for_topic(
+        db=db,
+        user_id=user_uuid,
+        current_topic_title=video_title,
+        limit=3
+    )
+
     chunks_data = await call_groq_api_for_explanation(
         transcript_text,
         language_name=lang_name,
-        career_goal=profile.career_goal
+        career_goal=profile.career_goal,
+        previous_memories=previous_memories
     )
 
     session = LearningSession(
@@ -669,6 +691,9 @@ async def explain_youtube_transcript(
     db.add(session)
     await db.commit()
     await db.refresh(session)
+
+    # Index learning memory snapshot
+    await create_or_update_memory_from_session(db=db, session=session)
 
     await update_profile_on_explanation(db=db, user_id=user_uuid, language=target_lang)
 
@@ -864,6 +889,9 @@ async def submit_quiz_phase(
         passed=passed,
         is_session_completed=bool(session.user_progress.get("is_completed"))
     )
+
+    # Automatically update UserLearningMemory with latest quiz performance & mastery
+    await create_or_update_memory_from_session(db=db, session=session)
 
     chunks = session.explanation_chunks.get("chunks", [])
 
