@@ -20,6 +20,7 @@ from src.services.ai_mentor_service import (
 @pytest_asyncio.fixture
 async def setup_test_user(db_session: AsyncSession):
     uni = University(
+        id=uuid.uuid4(),
         name="Mentor Test University",
         email_domain=f"mentor-{uuid.uuid4().hex[:6]}.edu"
     )
