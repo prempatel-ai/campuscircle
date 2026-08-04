@@ -26,6 +26,34 @@ interface ConceptGap {
   last_seen_at: string;
 }
 
+interface StudentProfile {
+  user_id: string;
+  total_sessions: number;
+  total_study_time_seconds: number;
+  topics_completed: number;
+  topics_learning: number;
+  avg_quiz_score: number;
+  highest_quiz_score: number;
+  total_quizzes_completed: number;
+  strong_concepts: string[];
+  weak_concepts: string[];
+  preferred_language: string;
+  current_streak_days: number;
+  career_goal: string | null;
+}
+
+const CAREER_GOALS = [
+  { id: "Placement Preparation", label: "Placement Preparation", icon: "💼", desc: "Coding interviews, DS/Algo, time complexity" },
+  { id: "AI / Machine Learning", label: "AI / Machine Learning", icon: "🤖", desc: "ML models, neural nets, math, vector spaces" },
+  { id: "Data Science", label: "Data Science", icon: "📊", desc: "Data analysis, SQL, statistics, visualization" },
+  { id: "Web Development", label: "Web Development", icon: "🌐", desc: "Frontend, backend, APIs, system architecture" },
+  { id: "Mobile Development", label: "Mobile Development", icon: "📱", desc: "iOS, Android, cross-platform apps, UI/UX" },
+  { id: "Competitive Programming", label: "Competitive Programming", icon: "⚡", desc: "Fast problem solving, edge cases, algorithms" },
+  { id: "GATE", label: "GATE Exam", icon: "🎓", desc: "Core CS theory, formulas, exam problems" },
+  { id: "Research", label: "Academic Research", icon: "🔬", desc: "Papers, deep theory, mathematical proofs" },
+  { id: "Other", label: "General Learning", icon: "🚀", desc: "Comprehensive foundational understanding" },
+];
+
 const SAMPLE_VIDEOS = [
   {
     title: "Python in 100 Seconds",
@@ -60,6 +88,9 @@ export default function LearnPage() {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
 
   const [userGaps, setUserGaps] = useState<ConceptGap[]>([]);
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [showGoalModal, setShowGoalModal] = useState<boolean>(false);
+  const [isSavingGoal, setIsSavingGoal] = useState<boolean>(false);
 
   const [viewState, setViewState] = useState<"input" | "loading" | "explanation" | "quiz">("input");
   const [loadingStep, setLoadingStep] = useState<string>("Processing topic content...");
@@ -67,18 +98,41 @@ export default function LearnPage() {
   const [explainData, setExplainData] = useState<ExplainResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch student's recurring concept gaps for dashboard
+  // Fetch student's profile & concept gaps on mount
   useEffect(() => {
-    async function loadGaps() {
+    async function loadData() {
       try {
-        const res = await apiRequest<{ gaps: ConceptGap[] }>("/api/v1/learn/me/gaps");
-        setUserGaps(res.gaps || []);
+        const [gapsRes, profileRes] = await Promise.all([
+          apiRequest<{ gaps: ConceptGap[] }>("/api/v1/learn/me/gaps"),
+          apiRequest<StudentProfile>("/api/v1/learn/me/profile"),
+        ]);
+        setUserGaps(gapsRes.gaps || []);
+        setProfile(profileRes);
+        if (!profileRes.career_goal) {
+          setShowGoalModal(true);
+        }
       } catch (err) {
         // Non-critical, ignore
       }
     }
-    loadGaps();
+    loadData();
   }, []);
+
+  const handleSelectCareerGoal = async (goal: string) => {
+    setIsSavingGoal(true);
+    try {
+      const updated = await apiRequest<StudentProfile>("/api/v1/learn/me/career-goal", {
+        method: "PATCH",
+        body: JSON.stringify({ career_goal: goal }),
+      });
+      setProfile(updated);
+      setShowGoalModal(false);
+    } catch (err) {
+      setError("Failed to save career goal. Please try again.");
+    } finally {
+      setIsSavingGoal(false);
+    }
+  };
 
   const handleExtractAndExplain = async (urlToProcess: string, directText?: string) => {
     if (inputMode === "url" && !urlToProcess.trim()) {
@@ -180,11 +234,23 @@ export default function LearnPage() {
           <div className="space-y-6 animate-in fade-in duration-200">
             {/* Hero Header */}
             <div className="space-y-2 border-b border-border-muted/50 pb-4">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full font-mono text-[11px] font-bold">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-                <span>AI Learning Accelerator</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full font-mono text-[11px] font-bold">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  <span>AI Learning Accelerator</span>
+                </div>
+
+                {profile?.career_goal && (
+                  <button
+                    onClick={() => setShowGoalModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface border border-border-muted text-ink/80 hover:border-primary/40 rounded-full font-mono text-[11px] font-bold transition-all cursor-pointer shadow-2xs"
+                  >
+                    <span>Goal: {profile.career_goal}</span>
+                    <span className="text-primary text-[10px] underline">(Change)</span>
+                  </button>
+                )}
               </div>
               <h1 className="font-display text-2xl sm:text-3xl font-bold text-primary tracking-tight">
                 Turn Any Topic into Mastery
@@ -389,6 +455,61 @@ export default function LearnPage() {
           </div>
         </div>
       </div>
+
+      {/* Onboarding & Goal Selector Modal */}
+      {showGoalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-surface border border-border-muted rounded-3xl p-6 sm:p-8 max-w-xl w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="space-y-2 text-center sm:text-left border-b border-border-muted/50 pb-4">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full font-mono text-[11px] font-bold">
+                <span>Personalized Learning Context</span>
+              </div>
+              <h2 className="font-display text-2xl font-bold text-primary">
+                What are you learning for?
+              </h2>
+              <p className="font-sans text-xs sm:text-sm text-ink/70 leading-relaxed">
+                Select your primary career learning goal so Reva AI can tailor real-world examples, domain focus, and interview emphasis specifically for you.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[340px] overflow-y-auto pr-1">
+              {CAREER_GOALS.map((goal) => {
+                const isSelected = profile?.career_goal === goal.id;
+                return (
+                  <button
+                    key={goal.id}
+                    disabled={isSavingGoal}
+                    onClick={() => handleSelectCareerGoal(goal.id)}
+                    className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                      isSelected
+                        ? "bg-primary/10 border-primary text-primary shadow-xs ring-1 ring-primary/30"
+                        : "bg-background border-border-muted/80 text-ink hover:border-primary/50 hover:bg-surface"
+                    }`}
+                  >
+                    <span className="text-xl shrink-0 mt-0.5">{goal.icon}</span>
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="font-sans text-xs font-bold truncate">{goal.label}</p>
+                      <p className="font-sans text-[11px] text-ink/60 leading-snug line-clamp-2">{goal.desc}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {profile?.career_goal && (
+              <div className="flex justify-end pt-2 border-t border-border-muted/50">
+                <button
+                  type="button"
+                  onClick={() => setShowGoalModal(false)}
+                  className="px-4 py-2 bg-background border border-border-muted hover:bg-surface text-ink/80 text-xs font-sans font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
