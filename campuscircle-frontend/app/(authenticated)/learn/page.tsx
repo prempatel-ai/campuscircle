@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ExplanationChunks } from "@/components/ExplanationChunks";
 import { LearnQuiz } from "@/components/LearnQuiz";
 import { LessonChat } from "@/components/LessonChat";
+import { LearningDashboard, type DashboardData } from "@/components/LearningDashboard";
 import { apiRequest, ApiError } from "@/lib/api";
 
 interface Chunk {
@@ -162,6 +163,8 @@ export default function LearnPage() {
   const [mentorGuidance, setMentorGuidance] = useState<PreSessionMentor | null>(null);
   const [showGoalModal, setShowGoalModal] = useState<boolean>(false);
   const [isSavingGoal, setIsSavingGoal] = useState<boolean>(false);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
 
   const [viewState, setViewState] = useState<"input" | "loading" | "explanation" | "quiz">("input");
   const [loadingStep, setLoadingStep] = useState<string>("Processing topic content...");
@@ -169,7 +172,17 @@ export default function LearnPage() {
   const [explainData, setExplainData] = useState<ExplainResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch student's profile, mentor guidance & concept gaps on mount
+  // Refresh dashboard data (called on mount and after lesson/quiz events)
+  const refreshDashboard = useCallback(async () => {
+    try {
+      const dash = await apiRequest<DashboardData>("/api/v1/learn/me/dashboard");
+      setDashboardData(dash);
+    } catch {
+      // Non-critical — dashboard will show previous data or empty state
+    }
+  }, []);
+
+  // Fetch student's profile, mentor guidance, concept gaps, and dashboard on mount
   useEffect(() => {
     async function loadData() {
       try {
@@ -184,12 +197,19 @@ export default function LearnPage() {
         if (!profileRes.career_goal) {
           setShowGoalModal(true);
         }
-      } catch (err) {
+      } catch {
         // Non-critical, ignore
       }
+      // Load dashboard independently so a mentor failure doesn't block it
+      refreshDashboard();
     }
     loadData();
-  }, []);
+  }, [refreshDashboard]);
+
+  // Auto-refresh dashboard whenever dashboardRefreshKey increments
+  useEffect(() => {
+    if (dashboardRefreshKey > 0) refreshDashboard();
+  }, [dashboardRefreshKey, refreshDashboard]);
 
   const handleSelectCareerGoal = async (goal: string) => {
     setIsSavingGoal(true);
@@ -240,6 +260,8 @@ export default function LearnPage() {
       clearTimeout(progressTimer);
       setExplainData(response);
       setViewState("explanation");
+      // Refresh dashboard after new lesson is generated
+      setDashboardRefreshKey((k) => k + 1);
     } catch (err) {
       setViewState("input");
       if (err instanceof ApiError) {
@@ -260,40 +282,26 @@ export default function LearnPage() {
 
   return (
     <div className="flex-1 text-ink font-sans grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 py-6 items-start">
-      {/* LEFT PANEL: Concept Gaps */}
-      <div className="hidden lg:block lg:col-span-3 lg:sticky lg:top-20 space-y-4">
-        <div className="bg-surface-subtle border border-border-muted/70 rounded-2xl p-5 space-y-3.5 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-border-muted/50 pb-2.5">
-            <h3 className="font-display text-sm font-bold text-primary flex items-center gap-2">
-              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-              <span>Concept Gaps</span>
-            </h3>
-            {userGaps.length > 0 && (
-              <span className="text-[10px] font-mono font-bold text-primary px-2 py-0.5 bg-primary/10 rounded-full">
-                {userGaps.length}
-              </span>
-            )}
+      {/* LEFT PANEL: Learning Dashboard */}
+      <div className="hidden lg:block lg:col-span-3 lg:sticky lg:top-20 max-h-[calc(100vh-5rem)] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#2F523330_transparent] space-y-4 pr-0.5">
+        <div className="bg-surface-subtle border border-border-muted/70 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center gap-2 border-b border-border-muted/50 pb-3 mb-4">
+            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <h3 className="font-display text-sm font-bold text-primary">Learning Dashboard</h3>
           </div>
 
-          <p className="font-sans text-xs text-ink/75 leading-relaxed">
-            Concepts flagged for review based on your previous adaptive quiz performance.
-          </p>
-
-          {userGaps.length === 0 ? (
-            <div className="p-3 bg-surface border border-border-muted/60 rounded-xl text-center">
-              <p className="text-xs font-sans text-ink/50">No concept gaps yet. Complete a quiz to track weak areas!</p>
-            </div>
+          {dashboardData ? (
+            <LearningDashboard
+              data={dashboardData}
+              mentor={mentorGuidance}
+              onChangeGoal={() => setShowGoalModal(true)}
+            />
           ) : (
-            <div className="flex flex-col gap-2 pt-1">
-              {userGaps.map((g, idx) => (
-                <div key={idx} className="p-2.5 bg-surface border border-border-muted/60 rounded-xl flex items-center justify-between text-xs font-sans shadow-2xs">
-                  <span className="font-semibold text-ink truncate">{g.concept_category}</span>
-                  <span className="px-2 py-0.5 bg-red-100 text-red-700 font-mono text-[10px] font-bold rounded-md shrink-0">
-                    {g.miss_count} miss{g.miss_count > 1 ? "es" : ""}
-                  </span>
-                </div>
+            <div className="space-y-3 animate-pulse">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-12 bg-border-muted/40 rounded-xl" />
               ))}
             </div>
           )}
@@ -554,6 +562,7 @@ export default function LearnPage() {
           <LearnQuiz
             sessionId={explainData.session_id}
             onBackToExplanation={() => setViewState("explanation")}
+            onQuizComplete={() => setDashboardRefreshKey((k) => k + 1)}
           />
 
           {/* Interactive Lesson Chat */}
@@ -565,32 +574,52 @@ export default function LearnPage() {
       )}
       </div>
 
-      {/* RIGHT PANEL: How It Works */}
-      <div className="hidden lg:flex lg:col-span-3 flex-col gap-5 lg:sticky lg:top-20">
+      {/* RIGHT PANEL: Quick Start Tips */}
+      <div className="hidden lg:flex lg:col-span-3 flex-col gap-4 lg:sticky lg:top-20">
         <div className="bg-surface-subtle border border-border-muted/70 rounded-2xl p-5 space-y-4 shadow-2xs">
           <h3 className="font-display text-sm font-bold text-primary flex items-center gap-2 border-b border-border-muted/50 pb-2.5">
-            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
-            <span>How Learn AI Works</span>
+            <span>How It Works</span>
           </h3>
-
-          <div className="space-y-3 font-sans text-xs text-ink/75 leading-relaxed">
-            <div className="flex gap-2.5 items-start">
-              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">1</span>
-              <p><strong className="text-ink">Input Material:</strong> Paste a YouTube video link or lecture notes in any supported language.</p>
-            </div>
-            <div className="flex gap-2.5 items-start">
-              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">2</span>
-              <p><strong className="text-ink">Story Chunks:</strong> AI breaks down complex topics into bite-sized storytelling chapters.</p>
-            </div>
-            <div className="flex gap-2.5 items-start">
-              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">3</span>
-              <p><strong className="text-ink">3-Phase Quiz:</strong> Test recall and identify weak concept gaps for targeted review.</p>
-            </div>
+          <div className="space-y-3 font-sans text-xs text-ink/70 leading-relaxed">
+            {[
+              { n: "1", title: "Input Material", desc: "Paste a YouTube link or lecture notes." },
+              { n: "2", title: "Story Chunks", desc: "AI breaks it into storytelling chapters." },
+              { n: "3", title: "3-Phase Quiz", desc: "Test retention and surface weak areas." },
+              { n: "4", title: "Ask Reva", desc: "Follow-up chat about any part of the lesson." },
+            ].map(({ n, title, desc }) => (
+              <div key={n} className="flex gap-2.5 items-start">
+                <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">{n}</span>
+                <p><strong className="text-ink">{title}:</strong> {desc}</p>
+              </div>
+            ))}
           </div>
         </div>
+
+        {/* Daily stats summary from dashboard */}
+        {dashboardData && dashboardData.total_sessions > 0 && (
+          <div className="bg-primary/6 border border-primary/15 rounded-2xl p-4 space-y-2">
+            <p className="font-mono text-[10px] font-bold text-primary/70 uppercase">Today's Goal</p>
+            <div className="flex items-center justify-between">
+              <span className="font-sans text-xs text-ink/70">Avg Score</span>
+              <span className="font-mono text-xs font-bold text-primary">{dashboardData.avg_quiz_score}%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-sans text-xs text-ink/70">Topics Done</span>
+              <span className="font-mono text-xs font-bold text-primary">{dashboardData.topics_completed}</span>
+            </div>
+            {dashboardData.current_streak_days > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="font-sans text-xs text-ink/70">Streak</span>
+                <span className="font-mono text-xs font-bold text-amber-600">{dashboardData.current_streak_days}d</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
 
       {/* Onboarding & Goal Selector Modal */}
       {showGoalModal && (

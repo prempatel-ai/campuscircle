@@ -80,9 +80,10 @@ interface PostSessionMentor {
 interface LearnQuizProps {
   sessionId: string;
   onBackToExplanation: () => void;
+  onQuizComplete?: () => void;
 }
 
-export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
+export function LearnQuiz({ sessionId, onBackToExplanation, onQuizComplete }: LearnQuizProps) {
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
   const [activePhase, setActivePhase] = useState<number>(1);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
@@ -181,6 +182,9 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
 
       await fetchQuizData(false);
       await fetchUserGaps();
+
+      // Notify parent to refresh dashboard
+      onQuizComplete?.();
 
       // Fetch Reva AI Post-Session Mentor Summary
       try {
