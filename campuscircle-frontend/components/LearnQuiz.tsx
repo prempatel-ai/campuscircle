@@ -70,6 +70,13 @@ interface ConceptGap {
   last_seen_at: string;
 }
 
+interface PostSessionMentor {
+  summary_message: string;
+  strengths: string[];
+  needs_practice: string[];
+  suggested_next_topic?: string;
+}
+
 interface LearnQuizProps {
   sessionId: string;
   onBackToExplanation: () => void;
@@ -84,6 +91,7 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [phaseResults, setPhaseResults] = useState<Record<number, SubmitResult>>({});
+  const [postSessionMentor, setPostSessionMentor] = useState<PostSessionMentor | null>(null);
   const [remediations, setRemediations] = useState<Record<string, RemediateData>>({});
   const [loadingRemediationChunk, setLoadingRemediationChunk] = useState<string | null>(null);
 
@@ -173,6 +181,16 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
 
       await fetchQuizData(false);
       await fetchUserGaps();
+
+      // Fetch Reva AI Post-Session Mentor Summary
+      try {
+        const mentorSummary = await apiRequest<PostSessionMentor>(`/api/v1/learn/${sessionId}/mentor/post-session`, {
+          method: "POST"
+        });
+        setPostSessionMentor(mentorSummary);
+      } catch (mentorErr) {
+        // Non-critical, fallback UI will handle
+      }
 
       if (result.passed && result.next_phase_unlocked) {
         setActivePhase(result.next_phase_unlocked);
@@ -295,6 +313,61 @@ export function LearnQuiz({ sessionId, onBackToExplanation }: LearnQuizProps) {
           <p className="font-sans text-sm text-ink/80 max-w-md mx-auto">
             You've successfully passed all 3 phases (Recall, Application, and Synthesis) for this topic.
           </p>
+        </div>
+      )}
+
+      {/* Reva AI Post-Session Mentor Summary Banner */}
+      {postSessionMentor && (
+        <div className="bg-gradient-to-r from-primary/10 via-surface to-primary/5 border border-primary/20 rounded-2xl p-6 space-y-4 shadow-2xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 border-b border-primary/10 pb-3">
+            <span className="w-7 h-7 rounded-full bg-primary text-surface font-mono font-bold text-xs flex items-center justify-center shadow-xs">
+              🤖
+            </span>
+            <h3 className="font-display text-base font-bold text-primary">
+              Reva Mentor Feedback
+            </h3>
+          </div>
+
+          <p className="font-sans text-xs sm:text-sm text-ink/80 leading-relaxed">
+            {postSessionMentor.summary_message}
+          </p>
+
+          <div className="flex flex-wrap gap-4 text-xs font-sans pt-1 border-t border-border-muted/50">
+            {postSessionMentor.strengths && postSessionMentor.strengths.length > 0 && (
+              <div className="space-y-1">
+                <span className="font-bold text-emerald-700 font-mono text-[11px]">STRENGTHS SHOWN:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {postSessionMentor.strengths.map((s, idx) => (
+                    <span key={idx} className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[11px]">
+                      ✓ {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {postSessionMentor.needs_practice && postSessionMentor.needs_practice.length > 0 && (
+              <div className="space-y-1">
+                <span className="font-bold text-amber-700 font-mono text-[11px]">PRACTICE AREAS:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {postSessionMentor.needs_practice.map((np, idx) => (
+                    <span key={idx} className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-semibold text-[11px]">
+                      • {np}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {postSessionMentor.suggested_next_topic && (
+            <div className="pt-2 border-t border-primary/10 flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs font-sans text-ink/60">Suggested Follow-Up Topic:</span>
+              <span className="px-3 py-1 bg-primary/10 text-primary font-mono text-xs font-bold rounded-lg border border-primary/20">
+                {postSessionMentor.suggested_next_topic}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

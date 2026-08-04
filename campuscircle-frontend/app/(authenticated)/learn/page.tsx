@@ -42,6 +42,14 @@ interface StudentProfile {
   career_goal: string | null;
 }
 
+interface PreSessionMentor {
+  greeting: string;
+  mentor_message: string;
+  suggested_next_topic?: string;
+  career_goal?: string;
+  streak_days: number;
+}
+
 const CAREER_GOALS = [
   { id: "Placement Preparation", label: "Placement Preparation", icon: "💼", desc: "Coding interviews, DS/Algo, time complexity" },
   { id: "AI / Machine Learning", label: "AI / Machine Learning", icon: "🤖", desc: "ML models, neural nets, math, vector spaces" },
@@ -89,6 +97,7 @@ export default function LearnPage() {
 
   const [userGaps, setUserGaps] = useState<ConceptGap[]>([]);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [mentorGuidance, setMentorGuidance] = useState<PreSessionMentor | null>(null);
   const [showGoalModal, setShowGoalModal] = useState<boolean>(false);
   const [isSavingGoal, setIsSavingGoal] = useState<boolean>(false);
 
@@ -98,16 +107,18 @@ export default function LearnPage() {
   const [explainData, setExplainData] = useState<ExplainResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch student's profile & concept gaps on mount
+  // Fetch student's profile, mentor guidance & concept gaps on mount
   useEffect(() => {
     async function loadData() {
       try {
-        const [gapsRes, profileRes] = await Promise.all([
+        const [gapsRes, profileRes, mentorRes] = await Promise.all([
           apiRequest<{ gaps: ConceptGap[] }>("/api/v1/learn/me/gaps"),
           apiRequest<StudentProfile>("/api/v1/learn/me/profile"),
+          apiRequest<PreSessionMentor>("/api/v1/learn/me/mentor/pre-session"),
         ]);
         setUserGaps(gapsRes.gaps || []);
         setProfile(profileRes);
+        setMentorGuidance(mentorRes);
         if (!profileRes.career_goal) {
           setShowGoalModal(true);
         }
@@ -259,6 +270,50 @@ export default function LearnPage() {
                 Paste a YouTube link or study notes to generate storytelling explanations and test your retention with an adaptive 3-phase quiz.
               </p>
             </div>
+
+            {/* Reva AI Mentor Card */}
+            {mentorGuidance && (
+              <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-surface border border-primary/20 rounded-2xl p-5 space-y-3 shadow-2xs animate-in fade-in duration-200">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-full bg-primary text-surface font-mono font-bold text-xs flex items-center justify-center shadow-xs">
+                      🤖
+                    </span>
+                    <span className="font-display text-sm font-bold text-primary">
+                      {mentorGuidance.greeting}
+                    </span>
+                  </div>
+                  {mentorGuidance.streak_days > 0 && (
+                    <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 font-mono text-[10px] font-bold rounded-full border border-amber-200">
+                      🔥 {mentorGuidance.streak_days} Day Streak
+                    </span>
+                  )}
+                </div>
+
+                <p className="font-sans text-xs sm:text-sm text-ink/80 leading-relaxed">
+                  {mentorGuidance.mentor_message}
+                </p>
+
+                {mentorGuidance.suggested_next_topic && (
+                  <div className="pt-1 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-sans text-ink/60 font-semibold">Suggested Next Topic:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputMode("text");
+                        setPastedText(mentorGuidance.suggested_next_topic || "");
+                      }}
+                      className="px-3 py-1 bg-surface border border-primary/30 hover:bg-primary/10 text-primary font-sans font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1"
+                    >
+                      <span>{mentorGuidance.suggested_next_topic}</span>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Main Card */}
             <div className="bg-surface border border-border-muted rounded-2xl p-6 space-y-6 shadow-2xs">
