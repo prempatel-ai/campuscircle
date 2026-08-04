@@ -5,6 +5,7 @@ import { ExplanationChunks } from "@/components/ExplanationChunks";
 import { LearnQuiz } from "@/components/LearnQuiz";
 import { LessonChat } from "@/components/LessonChat";
 import { LearningDashboard, type DashboardData } from "@/components/LearningDashboard";
+import { LearningReports } from "@/components/LearningReports";
 import { apiRequest, ApiError } from "@/lib/api";
 
 interface Chunk {
@@ -570,6 +571,9 @@ export default function LearnPage() {
             sessionId={explainData.session_id}
             lessonTitle={explainData.video_title}
           />
+
+          {/* Weekly Reports */}
+          <LearningReports />
         </div>
       )}
       </div>

@@ -20,6 +20,7 @@ from src.models.learning_session import LearningSession
 from src.models.student_learning_profile import StudentLearningProfile
 from src.models.user_learning_memory import UserLearningMemory
 from src.models.lesson_chat_message import LessonChatMessage
+from src.models.weekly_learning_report import WeeklyLearningReport
 
 __all__ = [
     "University",
@@ -42,4 +43,5 @@ __all__ = [
     "StudentLearningProfile",
     "UserLearningMemory",
     "LessonChatMessage",
+    "WeeklyLearningReport",
 ]

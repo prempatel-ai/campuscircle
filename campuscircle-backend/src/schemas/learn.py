@@ -225,3 +225,38 @@ class LearningDashboardOut(BaseModel):
 
     # Concept gaps summary
     top_concept_gaps: List[str] = Field(default_factory=list)  # top 5 by miss_count
+
+
+# ── Weekly Learning Report schemas ──────────────────────────────────────────
+
+class WeeklyLearningReportOut(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    week_start: datetime
+    week_end: datetime
+
+    # Stats
+    total_study_time_seconds: int
+    lessons_completed: int
+    quizzes_completed: int
+    avg_quiz_score: float
+    highest_quiz_score: float
+    streak_days: int
+
+    # Lists
+    topics_completed: List[str] = Field(default_factory=list)
+    topics_needing_revision: List[str] = Field(default_factory=list)
+    most_improved_concepts: List[str] = Field(default_factory=list)
+    weak_concepts: List[str] = Field(default_factory=list)
+    recommended_next_topics: List[str] = Field(default_factory=list)
+
+    # Narrative
+    ai_summary: str
+    career_goal: Optional[str] = None
+    is_ai_generated: bool
+
+    generated_at: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

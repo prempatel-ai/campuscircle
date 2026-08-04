@@ -51,6 +51,7 @@ from src.schemas.learn import (
     LessonChatSendIn,
     LessonChatMessageOut,
     LearningDashboardOut,
+    WeeklyLearningReportOut,
 )
 from src.services.learning_profile_service import (
     get_or_create_learning_profile,
@@ -67,6 +68,11 @@ from src.services.ai_mentor_service import (
     generate_postsession_mentor_summary
 )
 from src.services.dashboard_service import get_learning_dashboard
+from src.services.weekly_report_service import (
+    get_or_generate_current_week_report,
+    list_reports_for_user,
+    get_report_by_id,
+)
 
 router = APIRouter(prefix="/learn", tags=["learn"])
 
@@ -1127,6 +1133,60 @@ async def get_learning_dashboard_endpoint(
     """
     user_uuid = uuid.UUID(current_user["user_id"])
     return await get_learning_dashboard(db=db, user_id=user_uuid)
+
+
+# ── Weekly Learning Report endpoints ────────────────────────────────────────
+
+@router.get(
+    "/me/reports",
+    response_model=List[WeeklyLearningReportOut],
+    status_code=status.HTTP_200_OK,
+    summary="List all weekly learning reports for the current student",
+)
+async def list_my_reports(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns all stored weekly reports, newest first (max 12 = 3 months)."""
+    user_uuid = uuid.UUID(current_user["user_id"])
+    return await list_reports_for_user(db=db, user_id=user_uuid)
+
+
+@router.get(
+    "/me/reports/current",
+    response_model=WeeklyLearningReportOut,
+    status_code=status.HTTP_200_OK,
+    summary="Get or generate the current week's learning report",
+)
+async def get_current_week_report(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns the current week's report if it exists, otherwise generates it
+    by aggregating this week's learning data and (optionally) calling Groq
+    for a personalized narrative. Safe to call repeatedly — generates once.
+    """
+    user_uuid = uuid.UUID(current_user["user_id"])
+    return await get_or_generate_current_week_report(db=db, user_id=user_uuid)
+
+
+@router.get(
+    "/me/reports/{report_id}",
+    response_model=WeeklyLearningReportOut,
+    status_code=status.HTTP_200_OK,
+    summary="Get a specific weekly learning report",
+)
+async def get_specific_report(
+    report_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user_uuid = uuid.UUID(current_user["user_id"])
+    report = await get_report_by_id(db=db, user_id=user_uuid, report_id=report_id)
+    if not report:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found.")
+    return report
 
 
 @router.get(
