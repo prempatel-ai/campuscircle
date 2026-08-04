@@ -1,5 +1,6 @@
+import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, HttpUrl
 
 
@@ -124,3 +125,26 @@ class UserConceptGapOut(BaseModel):
 class UserGapsResponse(BaseModel):
     total_gaps_count: int
     gaps: List[UserConceptGapOut]
+
+
+class StudentLearningProfileOut(BaseModel):
+    user_id: uuid.UUID
+    total_sessions: int
+    total_study_time_seconds: int
+    topics_completed: int
+    topics_learning: int
+    avg_quiz_score: float
+    highest_quiz_score: float
+    total_quizzes_completed: int
+    strong_concepts: List[str]
+    weak_concepts: List[str]
+    preferred_language: str
+    current_streak_days: int
+    last_learning_date: Optional[datetime] = None
+    extra_data: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+

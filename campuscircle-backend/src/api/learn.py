@@ -43,7 +43,13 @@ from src.schemas.learn import (
     RemediateRequest,
     RemediateResponse,
     UserConceptGapOut,
-    UserGapsResponse
+    UserGapsResponse,
+    StudentLearningProfileOut
+)
+from src.services.learning_profile_service import (
+    get_or_create_learning_profile,
+    update_profile_on_explanation,
+    update_profile_on_quiz_submission
 )
 
 router = APIRouter(prefix="/learn", tags=["learn"])
@@ -599,6 +605,7 @@ async def explain_youtube_transcript(
     )).scalar_one() or 0
 
     if cached_session:
+        await update_profile_on_explanation(db=db, user_id=user_uuid, language=cached_session.language)
         raw_chunks = cached_session.explanation_chunks.get("chunks", [])
         return ExplainResponse(
             session_id=str(cached_session.id),
@@ -644,6 +651,8 @@ async def explain_youtube_transcript(
     db.add(session)
     await db.commit()
     await db.refresh(session)
+
+    await update_profile_on_explanation(db=db, user_id=user_uuid, language=target_lang)
 
     return ExplainResponse(
         session_id=str(session.id),
@@ -828,6 +837,16 @@ async def submit_quiz_phase(
     await db.commit()
     await db.refresh(session)
 
+    # Automatically update persistent StudentLearningProfile
+    await update_profile_on_quiz_submission(
+        db=db,
+        user_id=user_uuid,
+        score_percent=score,
+        phase=phase,
+        passed=passed,
+        is_session_completed=bool(session.user_progress.get("is_completed"))
+    )
+
     chunks = session.explanation_chunks.get("chunks", [])
 
     for q in questions:
@@ -971,3 +990,19 @@ async def get_user_concept_gaps(
         total_gaps_count=len(gap_models),
         gaps=gap_models
     )
+
+
+@router.get(
+    "/me/profile",
+    response_model=StudentLearningProfileOut,
+    status_code=status.HTTP_200_OK,
+    summary="Get current student's persistent learning profile and long-term statistics"
+)
+async def get_my_learning_profile(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user_uuid = uuid.UUID(current_user["user_id"])
+    profile = await get_or_create_learning_profile(db=db, user_id=user_uuid)
+    return profile
+
