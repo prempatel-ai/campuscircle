@@ -169,6 +169,8 @@ class PostSessionMentorOut(BaseModel):
     suggested_next_topic: Optional[str] = None
 
 
+
+
 class LessonChatSendIn(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000, description="Follow-up question or message from student")
 
@@ -184,5 +186,42 @@ class LessonChatMessageOut(BaseModel):
         from_attributes = True
 
 
+# ── Learning Dashboard schemas ──────────────────────────────────────────────
+
+class SubjectMasteryItem(BaseModel):
+    subject: str
+    mastery_percent: float  # 0–100, derived from avg quiz score in that subject
+    sessions_count: int
 
 
+class RecentActivityItem(BaseModel):
+    topic_title: str
+    subject_category: str
+    quiz_score: float
+    mastery_level: str
+    completed_at: datetime
+
+
+class LearningDashboardOut(BaseModel):
+    # Core stats (from StudentLearningProfile)
+    total_sessions: int
+    total_study_time_seconds: int
+    topics_completed: int
+    avg_quiz_score: float
+    highest_quiz_score: float
+    current_streak_days: int
+    career_goal: Optional[str] = None
+
+    # Concept strength (from StudentLearningProfile)
+    strong_concepts: List[str] = Field(default_factory=list)
+    weak_concepts: List[str] = Field(default_factory=list)
+
+    # Subject mastery (computed from UserLearningMemory)
+    subject_mastery: List[SubjectMasteryItem] = Field(default_factory=list)
+    overall_mastery_percent: float  # weighted average across all subjects
+
+    # Recent activity (last 7 UserLearningMemory records)
+    recent_activity: List[RecentActivityItem] = Field(default_factory=list)
+
+    # Concept gaps summary
+    top_concept_gaps: List[str] = Field(default_factory=list)  # top 5 by miss_count

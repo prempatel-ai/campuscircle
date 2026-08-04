@@ -49,7 +49,8 @@ from src.schemas.learn import (
     PreSessionMentorOut,
     PostSessionMentorOut,
     LessonChatSendIn,
-    LessonChatMessageOut
+    LessonChatMessageOut,
+    LearningDashboardOut,
 )
 from src.services.learning_profile_service import (
     get_or_create_learning_profile,
@@ -65,6 +66,7 @@ from src.services.ai_mentor_service import (
     generate_presession_mentor_guidance,
     generate_postsession_mentor_summary
 )
+from src.services.dashboard_service import get_learning_dashboard
 
 router = APIRouter(prefix="/learn", tags=["learn"])
 
@@ -1104,6 +1106,27 @@ async def get_postsession_mentor_summary(
 ):
     user_uuid = uuid.UUID(current_user["user_id"])
     return await generate_postsession_mentor_summary(db=db, user_id=user_uuid, session_id=session_id)
+
+
+@router.get(
+    "/me/dashboard",
+    response_model=LearningDashboardOut,
+    status_code=status.HTTP_200_OK,
+    summary="Get aggregated learning dashboard for the current student",
+)
+async def get_learning_dashboard_endpoint(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns a full learning dashboard aggregated from:
+    - StudentLearningProfile (stats, concepts)
+    - UserLearningMemory (subject mastery, recent activity)
+    - UserConceptGap (top gaps)
+    No AI calls are made — safe to call on every page load.
+    """
+    user_uuid = uuid.UUID(current_user["user_id"])
+    return await get_learning_dashboard(db=db, user_id=user_uuid)
 
 
 @router.get(
