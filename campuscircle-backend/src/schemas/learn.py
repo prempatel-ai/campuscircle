@@ -141,10 +141,16 @@ class StudentLearningProfileOut(BaseModel):
     preferred_language: str
     current_streak_days: int
     last_learning_date: Optional[datetime] = None
+    career_goal: Optional[str] = Field(None, description="Student's selected career learning goal")
     extra_data: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class CareerGoalUpdatePayload(BaseModel):
+    career_goal: str = Field(..., max_length=100, description="Selected career learning goal")
+
 

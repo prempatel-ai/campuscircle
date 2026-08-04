@@ -168,3 +168,19 @@ async def _sync_concept_mastery(
 
     profile.strong_concepts = list(extracted_categories)[:10]
     flag_modified(profile, "strong_concepts")
+
+
+async def update_career_goal(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    career_goal: str
+) -> StudentLearningProfile:
+    """
+    Updates the student's primary career learning goal.
+    """
+    profile = await get_or_create_learning_profile(db, user_id)
+    profile.career_goal = career_goal.strip()
+    await db.commit()
+    await db.refresh(profile)
+    return profile
+

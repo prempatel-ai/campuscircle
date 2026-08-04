@@ -36,6 +36,8 @@ class StudentLearningProfile(Base):
     current_streak_days: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     last_learning_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    career_goal: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
     # Extensible JSON store for future features (AI Mentor, career goals, etc.)
     extra_data: Mapped[dict] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), default=dict, server_default="{}", nullable=False

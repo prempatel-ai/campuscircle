@@ -141,3 +141,27 @@ async def test_quiz_submission_updates_profile_quiz_scores(
     assert profile["total_quizzes_completed"] == 1
     assert profile["avg_quiz_score"] == p1_data["score_percent"]
     assert profile["highest_quiz_score"] == p1_data["score_percent"]
+
+
+@pytest.mark.asyncio
+async def test_update_career_goal(
+    client: AsyncClient,
+    setup_test_user
+):
+    user, token = setup_test_user
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Update career goal
+    patch_res = await client.patch(
+        "/api/v1/learn/me/career-goal",
+        json={"career_goal": "AI / Machine Learning"},
+        headers=headers
+    )
+    assert patch_res.status_code == 200
+    assert patch_res.json()["career_goal"] == "AI / Machine Learning"
+
+    # 2. Fetch profile to confirm persistence
+    profile_res = await client.get("/api/v1/learn/me/profile", headers=headers)
+    assert profile_res.status_code == 200
+    assert profile_res.json()["career_goal"] == "AI / Machine Learning"
+

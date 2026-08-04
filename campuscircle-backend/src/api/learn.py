@@ -44,12 +44,14 @@ from src.schemas.learn import (
     RemediateResponse,
     UserConceptGapOut,
     UserGapsResponse,
-    StudentLearningProfileOut
+    StudentLearningProfileOut,
+    CareerGoalUpdatePayload
 )
 from src.services.learning_profile_service import (
     get_or_create_learning_profile,
     update_profile_on_explanation,
-    update_profile_on_quiz_submission
+    update_profile_on_quiz_submission,
+    update_career_goal
 )
 
 router = APIRouter(prefix="/learn", tags=["learn"])
@@ -321,14 +323,25 @@ _MOCK_CHUNKS = [
 ]
 
 
-async def call_groq_api_for_explanation(transcript_text: str, language_name: str = "English") -> List[dict]:
+async def call_groq_api_for_explanation(
+    transcript_text: str,
+    language_name: str = "English",
+    career_goal: Optional[str] = None
+) -> List[dict]:
     if not settings.groq_api_key:
         return _MOCK_CHUNKS
+
+    goal_prompt = (
+        f" The student's primary career goal is '{career_goal}'. Where relevant and natural, "
+        "tailor real-world analogies, practical examples, and domain emphasis to align with this goal "
+        "without forcing repetitive mentions."
+        if career_goal else ""
+    )
 
     system_prompt = (
         "You are an expert AI educator. Break down the provided video transcript into "
         "digestible, storytelling-style explanation chunks for a first-time learner. "
-        f"You MUST write all titles and explanations directly in {language_name}. "
+        f"You MUST write all titles and explanations directly in {language_name}.{goal_prompt} "
         "Return a JSON object with a single top-level key 'chunks' — a list where each item "
         "has exactly two string keys: 'title' and 'explanation'."
     )
@@ -637,7 +650,12 @@ async def explain_youtube_transcript(
         except VideoUnavailable:
             raise HTTPException(404, "This video is unavailable.")
 
-    chunks_data = await call_groq_api_for_explanation(transcript_text, language_name=lang_name)
+    profile = await get_or_create_learning_profile(db=db, user_id=user_uuid)
+    chunks_data = await call_groq_api_for_explanation(
+        transcript_text,
+        language_name=lang_name,
+        career_goal=profile.career_goal
+    )
 
     session = LearningSession(
         user_id=user_uuid,
@@ -1005,4 +1023,21 @@ async def get_my_learning_profile(
     user_uuid = uuid.UUID(current_user["user_id"])
     profile = await get_or_create_learning_profile(db=db, user_id=user_uuid)
     return profile
+
+
+@router.patch(
+    "/me/career-goal",
+    response_model=StudentLearningProfileOut,
+    status_code=status.HTTP_200_OK,
+    summary="Update current student's primary career learning goal"
+)
+async def patch_my_career_goal(
+    payload: CareerGoalUpdatePayload,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user_uuid = uuid.UUID(current_user["user_id"])
+    profile = await update_career_goal(db=db, user_id=user_uuid, career_goal=payload.career_goal)
+    return profile
+
 
