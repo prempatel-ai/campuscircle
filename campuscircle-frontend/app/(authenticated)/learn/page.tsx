@@ -324,16 +324,6 @@ export default function LearnPage() {
                   </svg>
                   <span>AI Learning Accelerator</span>
                 </div>
-
-                {profile?.career_goal && (
-                  <button
-                    onClick={() => setShowGoalModal(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface border border-border-muted text-ink/80 hover:border-primary/40 rounded-full font-mono text-[11px] font-bold transition-all cursor-pointer shadow-2xs"
-                  >
-                    <span>Goal: {profile.career_goal}</span>
-                    <span className="text-primary text-[10px] underline">(Change)</span>
-                  </button>
-                )}
               </div>
               <h1 className="font-display text-2xl sm:text-3xl font-bold text-primary tracking-tight">
                 Turn Any Topic into Mastery

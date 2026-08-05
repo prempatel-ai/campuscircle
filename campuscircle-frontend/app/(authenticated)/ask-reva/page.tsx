@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Lightbulb, FileText, Code, Target } from "lucide-react";
 import { apiRequest, ApiError } from "@/lib/api";
 import { AnonAvatar } from "@/components/AnonAvatar";
 import { useAuth } from "@/context/AuthContext";
@@ -33,25 +34,25 @@ const STARTER_PROMPTS = [
   {
     title: "Explain Complex Concepts",
     desc: "Get simple real-world analogies for tricky exam & lecture topics",
-    icon: "💡",
+    icon: Lightbulb,
     prompt: "Explain Binary Search and Recursion with real-world analogies as if I am a beginner.",
   },
   {
     title: "Viva & Exam Prep",
     desc: "Generate top 5 exam questions with concise model answers",
-    icon: "📝",
+    icon: FileText,
     prompt: "Give me top 5 DBMS viva questions with short, high-scoring model answers.",
   },
   {
     title: "Code & Algorithm Debugging",
     desc: "Analyze code snippets, time complexities, or logic errors",
-    icon: "⚡",
+    icon: Code,
     prompt: "How does Dynamic Programming differ from Greedy algorithms? Explain with examples.",
   },
   {
     title: "Personalized Study Plan",
     desc: "Build a structured roadmap for upcoming exams or career goals",
-    icon: "🎯",
+    icon: Target,
     prompt: "Create a 7-day study plan to master Data Structures & Algorithms before exams.",
   },
 ];
@@ -307,21 +308,26 @@ export default function AskRevaPage() {
 
               {/* 4 Student Starter Prompt Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full text-left">
-                {STARTER_PROMPTS.map((item, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSendMessage(item.prompt)}
-                    className="p-4 bg-surface hover:bg-surface-subtle border border-border-muted/80 hover:border-primary/40 rounded-2xl text-ink transition-all cursor-pointer shadow-2xs group flex items-start gap-3.5 text-left"
-                  >
-                    <span className="text-xl shrink-0 p-2 bg-background rounded-xl border border-border-muted/60 group-hover:scale-105 transition-transform">{item.icon}</span>
-                    <div className="space-y-1 min-w-0">
-                      <h3 className="font-sans font-bold text-xs text-ink group-hover:text-primary transition-colors flex items-center gap-1.5">
-                        <span>{item.title}</span>
-                      </h3>
-                      <p className="font-sans text-[11px] text-ink/70 leading-snug line-clamp-2">{item.desc}</p>
-                    </div>
-                  </button>
-                ))}
+                {STARTER_PROMPTS.map((item, idx) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleSendMessage(item.prompt)}
+                      className="p-4 bg-surface hover:bg-surface-subtle border border-border-muted/80 hover:border-primary/40 rounded-2xl text-ink transition-all cursor-pointer shadow-2xs group flex items-start gap-3.5 text-left"
+                    >
+                      <span className="p-2.5 bg-background rounded-xl border border-border-muted/60 text-primary group-hover:scale-105 transition-transform shrink-0">
+                        <Icon className="w-4 h-4" />
+                      </span>
+                      <div className="space-y-1 min-w-0">
+                        <h3 className="font-sans font-bold text-xs text-ink group-hover:text-primary transition-colors flex items-center gap-1.5">
+                          <span>{item.title}</span>
+                        </h3>
+                        <p className="font-sans text-[11px] text-ink/70 leading-snug line-clamp-2">{item.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : (
