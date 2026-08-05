@@ -76,7 +76,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     <div className="min-h-screen bg-background text-ink font-sans flex flex-col">
       {/* Shared Persistent Top Header */}
       <header className="bg-surface border-b border-border-muted px-3 sm:px-4 py-2.5 sticky top-0 z-30 shadow-2xs">
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-1 sm:px-4">
+        <div className="w-full flex items-center justify-between px-1 sm:px-4">
           {/* Logo & Main Nav */}
           <div className="flex items-center gap-4 sm:gap-6">
             <Link
@@ -322,7 +322,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       </header>
 
       {/* Main Page Children Container */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col pb-20 md:pb-6">{children}</main>
+      <main className="flex-1 w-full px-4 sm:px-6 lg:px-8 flex flex-col pb-20 md:pb-6">{children}</main>
 
       {/* PWA Install Banner */}
       <InstallPrompt variant="banner" />

@@ -240,7 +240,7 @@ export default function AskRevaPage() {
 
       {/* 2. Center Reading Chat Column (Cols 4-9) */}
       <div className="lg:col-span-6 w-full flex flex-col items-center justify-between min-h-[calc(100vh-8rem)]">
-        <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col space-y-6">
+        <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col space-y-6">
           {/* Header with Mobile History Drawer Trigger */}
           <div className="flex items-center justify-between border-b border-border-muted/50 pb-4">
             <div className="space-y-0.5">
@@ -394,7 +394,7 @@ export default function AskRevaPage() {
         </div>
 
         {/* 3. Floating Pill-Shaped Input Bar (Sticky at Bottom) */}
-        <div className="sticky bottom-16 md:bottom-4 z-30 w-full max-w-2xl mx-auto pt-2 bg-background/80 backdrop-blur-md">
+        <div className="sticky bottom-16 md:bottom-4 z-30 w-full max-w-4xl mx-auto pt-2 bg-background/80 backdrop-blur-md">
           {error && (
             <div className="mb-2 p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs font-sans text-red-700">
               {error}
