@@ -424,6 +424,28 @@ export default function LearnPage() {
               </div>
             )}
 
+            {/* Clean 3-Step Learning Stepper */}
+            <div className="flex items-center justify-between bg-surface border border-border-muted/80 rounded-2xl p-3 px-5 text-xs font-sans font-bold text-ink/70 shadow-2xs overflow-x-auto no-scrollbar gap-2">
+              <div className="flex items-center gap-2 text-primary font-bold shrink-0">
+                <span className="w-5 h-5 rounded-full bg-primary text-surface font-mono text-[11px] flex items-center justify-center">1</span>
+                <span>Story Chunks</span>
+              </div>
+              <svg className="w-4 h-4 text-ink/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="w-5 h-5 rounded-full bg-surface-subtle border border-border-muted text-ink/60 font-mono text-[11px] flex items-center justify-center">2</span>
+                <span>Adaptive Quiz</span>
+              </div>
+              <svg className="w-4 h-4 text-ink/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="w-5 h-5 rounded-full bg-surface-subtle border border-border-muted text-ink/60 font-mono text-[11px] flex items-center justify-center">3</span>
+                <span>Socratic Discussion</span>
+              </div>
+            </div>
+
             {/* Main Card */}
             <div className="bg-surface border border-border-muted rounded-2xl p-6 space-y-6 shadow-2xs">
             {/* Input Mode Selector (URL vs Text) */}

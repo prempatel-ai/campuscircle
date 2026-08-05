@@ -29,11 +29,31 @@ interface ChatMessage {
   timestamp: string;
 }
 
-const CATEGORY_CHIPS = [
-  { label: "Code Debugging", category: "code", prompt: "Help me debug my C++ code or explain an algorithm concept." },
-  { label: "Campus Discussions", category: "feed", prompt: "What are the latest discussions and posts trending on campus today?" },
-  { label: "DBMS & SQL Prep", category: "learn", prompt: "Can you explain SQL Joins or DBMS concepts for viva prep?" },
-  { label: "Viva Questions", category: "viva", prompt: "Give me top 5 viva questions and model answers for Operating Systems." },
+const STARTER_PROMPTS = [
+  {
+    title: "Explain Complex Concepts",
+    desc: "Get simple real-world analogies for tricky exam & lecture topics",
+    icon: "💡",
+    prompt: "Explain Binary Search and Recursion with real-world analogies as if I am a beginner.",
+  },
+  {
+    title: "Viva & Exam Prep",
+    desc: "Generate top 5 exam questions with concise model answers",
+    icon: "📝",
+    prompt: "Give me top 5 DBMS viva questions with short, high-scoring model answers.",
+  },
+  {
+    title: "Code & Algorithm Debugging",
+    desc: "Analyze code snippets, time complexities, or logic errors",
+    icon: "⚡",
+    prompt: "How does Dynamic Programming differ from Greedy algorithms? Explain with examples.",
+  },
+  {
+    title: "Personalized Study Plan",
+    desc: "Build a structured roadmap for upcoming exams or career goals",
+    icon: "🎯",
+    prompt: "Create a 7-day study plan to master Data Structures & Algorithms before exams.",
+  },
 ];
 
 function formatTimestamp(dateStr: string): string {
@@ -273,27 +293,33 @@ export default function AskRevaPage() {
           </div>
 
           {!hasStarted ? (
-            /* INITIAL OPEN STATE - VERTICALLY CENTERED */
-            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 my-auto min-h-[45vh]">
-              <div className="space-y-2">
-                <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-2">
-                  <AnonAvatar username="reva" size={40} shape="circle" />
+            /* INITIAL OPEN STATE - CLEAN STUDENT STARTER CARDS */
+            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8 my-auto min-h-[50vh] py-8">
+              <div className="space-y-3 max-w-md">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center mx-auto shadow-2xs">
+                  <AnonAvatar username="reva" size={44} shape="circle" />
                 </div>
-                <h2 className="font-display text-xl font-bold text-ink">What can I help you with today?</h2>
-                <p className="font-sans text-xs text-ink/60 max-w-md mx-auto">
-                  Ask about code issues, campus feed posts, exam concepts, or tag @reva in any discussion.
+                <h2 className="font-display text-2xl font-bold text-ink">What would you like to learn today?</h2>
+                <p className="font-sans text-xs text-ink/75 leading-relaxed">
+                  Ask Reva about your lectures, viva prep, coding challenges, or campus discussions.
                 </p>
               </div>
 
-              {/* Minimal Suggestion Pills */}
-              <div className="flex flex-wrap items-center justify-center gap-2 max-w-lg pt-2">
-                {CATEGORY_CHIPS.map((chip) => (
+              {/* 4 Student Starter Prompt Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full text-left">
+                {STARTER_PROMPTS.map((item, idx) => (
                   <button
-                    key={chip.category}
-                    onClick={() => handleSendMessage(chip.prompt)}
-                    className="px-3.5 py-1.5 rounded-full text-xs font-sans font-medium bg-surface text-ink/75 border border-border-muted/60 hover:border-primary/40 hover:text-primary transition-all shadow-2xs cursor-pointer"
+                    key={idx}
+                    onClick={() => handleSendMessage(item.prompt)}
+                    className="p-4 bg-surface hover:bg-surface-subtle border border-border-muted/80 hover:border-primary/40 rounded-2xl text-ink transition-all cursor-pointer shadow-2xs group flex items-start gap-3.5 text-left"
                   >
-                    {chip.label}
+                    <span className="text-xl shrink-0 p-2 bg-background rounded-xl border border-border-muted/60 group-hover:scale-105 transition-transform">{item.icon}</span>
+                    <div className="space-y-1 min-w-0">
+                      <h3 className="font-sans font-bold text-xs text-ink group-hover:text-primary transition-colors flex items-center gap-1.5">
+                        <span>{item.title}</span>
+                      </h3>
+                      <p className="font-sans text-[11px] text-ink/70 leading-snug line-clamp-2">{item.desc}</p>
+                    </div>
                   </button>
                 ))}
               </div>
