@@ -146,18 +146,7 @@ export function LearningDashboard({ data, mentor, onChangeGoal }: LearningDashbo
       ? data.avg_quiz_score
       : 0;
 
-  const displaySubjectMastery =
-    data.subject_mastery.length > 0
-      ? data.subject_mastery
-      : data.avg_quiz_score > 0
-      ? [
-          {
-            subject: "Computer Science",
-            mastery_percent: data.avg_quiz_score,
-            sessions_count: data.topics_completed || 1,
-          },
-        ]
-      : [];
+  const displaySubjectMastery = data.subject_mastery;
 
   return (
     <div className="space-y-4">

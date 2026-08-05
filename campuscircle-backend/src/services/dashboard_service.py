@@ -10,11 +10,36 @@ from collections import defaultdict
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.models.learning_session import LearningSession
 from src.models.student_learning_profile import StudentLearningProfile
 from src.models.user_learning_memory import UserLearningMemory
 from src.models.user_concept_gap import UserConceptGap
 from src.schemas.learn import LearningDashboardOut, SubjectMasteryItem, RecentActivityItem
 from src.services.learning_profile_service import get_or_create_learning_profile
+
+
+def infer_subject_category(topic_title: str) -> str:
+    """Dynamically infer subject category from topic title keywords."""
+    if not topic_title:
+        return "Computer Science"
+    t = topic_title.lower()
+    if any(k in t for k in ["python", "django", "flask", "numpy", "pandas", "pytorch", "script"]):
+        return "Python"
+    if any(k in t for k in ["dbms", "sql", "database", "postgres", "query", "normalization", "relational", "nosql"]):
+        return "DBMS"
+    if any(k in t for k in ["os", "operating system", "process", "thread", "kernel", "deadlock", "memory management"]):
+        return "Operating System"
+    if any(k in t for k in ["network", "tcp", "udp", "ip", "http", "socket", "dns", "router"]):
+        return "Computer Networks"
+    if any(k in t for k in ["algorithm", "data structure", "tree", "graph", "sorting", "binary search", "recursion", "dynamic programming"]):
+        return "Data Structures & Algorithms"
+    if any(k in t for k in ["ai", "ml", "machine learning", "deep learning", "neural", "llm", "rag", "transformer"]):
+        return "Artificial Intelligence"
+    if any(k in t for k in ["java", "c++", "c#", "rust", "go", "javascript", "typescript", "html", "css"]):
+        return "Programming & Development"
+    if any(k in t for k in ["system design", "distributed", "scalability", "load balancing", "microservices"]):
+        return "System Design"
+    return "Computer Science"
 
 
 async def get_learning_dashboard(
@@ -23,12 +48,12 @@ async def get_learning_dashboard(
 ) -> LearningDashboardOut:
     """
     Build a complete LearningDashboardOut for the given user.
-    All data is read from stored DB records — zero AI calls.
+    All data is read dynamically from stored DB records in real time.
     """
     # 1. Student Learning Profile (create if missing for brand-new users)
     profile: StudentLearningProfile = await get_or_create_learning_profile(db, user_id)
 
-    # 2. All learning memories ordered newest first
+    # 2. Query all user memories ordered newest first
     memories_stmt = (
         select(UserLearningMemory)
         .where(UserLearningMemory.user_id == user_id)
@@ -37,12 +62,46 @@ async def get_learning_dashboard(
     memories_res = await db.execute(memories_stmt)
     memories: List[UserLearningMemory] = list(memories_res.scalars().all())
 
-    # 3. Subject mastery — aggregate avg quiz score per subject_category
-    subject_buckets: dict[str, list[float]] = defaultdict(list)
-    for mem in memories:
-        if mem.subject_category and mem.quiz_score is not None and mem.quiz_score > 0:
-            subject_buckets[mem.subject_category].append(mem.quiz_score)
+    # 3. Query all user learning sessions ordered newest first
+    sessions_stmt = (
+        select(LearningSession)
+        .where(LearningSession.user_id == user_id)
+        .order_by(LearningSession.created_at.desc())
+    )
+    sessions_res = await db.execute(sessions_stmt)
+    sessions: List[LearningSession] = list(sessions_res.scalars().all())
 
+    # 4. Real-time Subject Mastery aggregation
+    subject_buckets: dict[str, list[float]] = defaultdict(list)
+    all_scores: list[float] = []
+
+    # Process memories
+    for mem in memories:
+        subject = mem.subject_category or infer_subject_category(mem.topic_title)
+        if mem.quiz_score is not None and mem.quiz_score > 0:
+            subject_buckets[subject].append(mem.quiz_score)
+            all_scores.append(mem.quiz_score)
+
+    # Process learning sessions for any completed quiz scores
+    for sess in sessions:
+        subject = infer_subject_category(sess.video_title)
+        progress = sess.user_progress or {}
+        scores_found = []
+        if isinstance(progress, dict):
+            for p_key in ["phase1_score", "phase2_score", "phase3_score"]:
+                if p_key in progress:
+                    try:
+                        val = float(progress[p_key])
+                        if val > 0:
+                            scores_found.append(val)
+                    except (ValueError, TypeError):
+                        pass
+        if scores_found:
+            sess_avg = sum(scores_found) / len(scores_found)
+            subject_buckets[subject].append(sess_avg)
+            all_scores.append(sess_avg)
+
+    # Calculate real-time subject mastery per subject
     subject_mastery: List[SubjectMasteryItem] = []
     for subject, scores in sorted(subject_buckets.items(), key=lambda x: -sum(x[1]) / len(x[1])):
         avg = round(sum(scores) / len(scores), 1)
@@ -52,17 +111,9 @@ async def get_learning_dashboard(
             sessions_count=len(scores),
         ))
 
-    if not subject_mastery and profile.avg_quiz_score > 0:
-        subject_mastery.append(SubjectMasteryItem(
-            subject="Computer Science",
-            mastery_percent=round(profile.avg_quiz_score, 1),
-            sessions_count=profile.topics_completed or profile.total_sessions or 1,
-        ))
-
-    # Overall mastery = weighted avg across all non-zero memory scores, falling back to profile.avg_quiz_score
-    non_zero_scores = [mem.quiz_score for mem in memories if mem.quiz_score is not None and mem.quiz_score > 0]
-    if non_zero_scores:
-        overall_mastery = round(sum(non_zero_scores) / len(non_zero_scores), 1)
+    # Real-time Overall Mastery calculation across all real session & memory quiz scores
+    if all_scores:
+        overall_mastery = round(sum(all_scores) / len(all_scores), 1)
     elif profile.avg_quiz_score > 0:
         overall_mastery = round(profile.avg_quiz_score, 1)
     else:
