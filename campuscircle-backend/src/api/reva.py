@@ -87,6 +87,22 @@ async def create_conversation(
     db: AsyncSession = Depends(get_db)
 ):
     user_uuid = uuid.UUID(current_user["user_id"])
+
+    # If the user already has an empty conversation (0 messages), reuse it
+    stmt = (
+        select(Conversation)
+        .where(Conversation.user_id == user_uuid)
+        .order_by(Conversation.created_at.desc())
+    )
+    res = await db.execute(stmt)
+    existing_convs = list(res.scalars().all())
+
+    for c in existing_convs:
+        count_stmt = select(func.count(ChatMessage.id)).where(ChatMessage.conversation_id == c.id)
+        msg_count = (await db.execute(count_stmt)).scalar() or 0
+        if msg_count == 0:
+            return c
+
     conversation = Conversation(user_id=user_uuid, title="New Chat")
     db.add(conversation)
     await db.commit()

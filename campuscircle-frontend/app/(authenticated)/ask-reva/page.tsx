@@ -96,18 +96,27 @@ export default function AskRevaPage() {
   }, []);
 
   const handleCreateConversation = useCallback(async () => {
+    // If current active conversation is already empty, reuse it
+    if (messages.length === 0 && activeConversationId) {
+      setError(null);
+      return;
+    }
     try {
       const conv = await apiRequest<ConversationItem>("/api/v1/reva/conversations", {
         method: "POST",
       });
-      setConversations((prev) => [conv, ...prev]);
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === conv.id);
+        if (exists) return prev;
+        return [conv, ...prev];
+      });
       setActiveConversationId(conv.id);
       setMessages([]);
       setError(null);
     } catch (err) {
       setError("Failed to create conversation.");
     }
-  }, []);
+  }, [messages.length, activeConversationId]);
 
   const handleSelectConversation = useCallback(async (id: string) => {
     setActiveConversationId(id);
