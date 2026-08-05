@@ -40,7 +40,7 @@ async def get_learning_dashboard(
     # 3. Subject mastery — aggregate avg quiz score per subject_category
     subject_buckets: dict[str, list[float]] = defaultdict(list)
     for mem in memories:
-        if mem.subject_category:
+        if mem.subject_category and mem.quiz_score is not None and mem.quiz_score > 0:
             subject_buckets[mem.subject_category].append(mem.quiz_score)
 
     subject_mastery: List[SubjectMasteryItem] = []
@@ -52,9 +52,21 @@ async def get_learning_dashboard(
             sessions_count=len(scores),
         ))
 
-    # Overall mastery = weighted avg across all memories
-    all_scores = [mem.quiz_score for mem in memories if mem.quiz_score is not None]
-    overall_mastery = round(sum(all_scores) / len(all_scores), 1) if all_scores else 0.0
+    if not subject_mastery and profile.avg_quiz_score > 0:
+        subject_mastery.append(SubjectMasteryItem(
+            subject="Computer Science",
+            mastery_percent=round(profile.avg_quiz_score, 1),
+            sessions_count=profile.topics_completed or profile.total_sessions or 1,
+        ))
+
+    # Overall mastery = weighted avg across all non-zero memory scores, falling back to profile.avg_quiz_score
+    non_zero_scores = [mem.quiz_score for mem in memories if mem.quiz_score is not None and mem.quiz_score > 0]
+    if non_zero_scores:
+        overall_mastery = round(sum(non_zero_scores) / len(non_zero_scores), 1)
+    elif profile.avg_quiz_score > 0:
+        overall_mastery = round(profile.avg_quiz_score, 1)
+    else:
+        overall_mastery = 0.0
 
     # 4. Recent activity — last 7 memories
     recent_raw = memories[:7]

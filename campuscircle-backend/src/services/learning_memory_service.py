@@ -97,8 +97,9 @@ async def create_or_update_memory_from_session(
         db.add(memory)
     else:
         memory.completed_at = now
-        memory.quiz_score = max(memory.quiz_score, score)
-        memory.mastery_level = mastery
+        if score > 0:
+            memory.quiz_score = max(memory.quiz_score or 0.0, score)
+            memory.mastery_level = mastery
         if key_concepts:
             memory.key_concepts = key_concepts[:5]
             flag_modified(memory, "key_concepts")

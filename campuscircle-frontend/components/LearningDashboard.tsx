@@ -139,6 +139,26 @@ function MasteryRing({ percent }: { percent: number }) {
 export function LearningDashboard({ data, mentor, onChangeGoal }: LearningDashboardProps) {
   const isNew = data.total_sessions === 0;
 
+  const effectiveOverallMastery =
+    data.overall_mastery_percent > 0
+      ? data.overall_mastery_percent
+      : data.avg_quiz_score > 0
+      ? data.avg_quiz_score
+      : 0;
+
+  const displaySubjectMastery =
+    data.subject_mastery.length > 0
+      ? data.subject_mastery
+      : data.avg_quiz_score > 0
+      ? [
+          {
+            subject: "Computer Science",
+            mastery_percent: data.avg_quiz_score,
+            sessions_count: data.topics_completed || 1,
+          },
+        ]
+      : [];
+
   return (
     <div className="space-y-4">
 
@@ -147,7 +167,7 @@ export function LearningDashboard({ data, mentor, onChangeGoal }: LearningDashbo
         <div className="bg-primary/8 border border-primary/20 rounded-xl px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <svg className="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138z" />
             </svg>
             <div className="min-w-0">
               <p className="font-mono text-[10px] text-primary/70 uppercase font-bold">Learning Goal</p>
@@ -193,10 +213,10 @@ export function LearningDashboard({ data, mentor, onChangeGoal }: LearningDashbo
       {/* ── Overall Mastery Ring ───────────────────────────────── */}
       {!isNew && (
         <div className="bg-surface-subtle border border-border-muted/60 rounded-xl p-4 flex items-center gap-5">
-          <MasteryRing percent={data.overall_mastery_percent} />
+          <MasteryRing percent={effectiveOverallMastery} />
           <div className="space-y-1.5 min-w-0">
             <p className="font-display text-sm font-bold text-ink leading-tight">
-              {masteryLabel(data.overall_mastery_percent)} Performance
+              {masteryLabel(effectiveOverallMastery)} Performance
             </p>
             <p className="font-sans text-[11px] text-ink/60 leading-relaxed">
               Based on {data.topics_completed} topic{data.topics_completed !== 1 ? "s" : ""} completed.
@@ -207,18 +227,18 @@ export function LearningDashboard({ data, mentor, onChangeGoal }: LearningDashbo
       )}
 
       {/* ── Subject Mastery bars ───────────────────────────────── */}
-      {data.subject_mastery.length > 0 && (
+      {displaySubjectMastery.length > 0 && (
         <div>
           <SectionHeading
             label="Subject Mastery"
             icon={
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002-2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             }
           />
           <div className="space-y-2.5">
-            {data.subject_mastery.slice(0, 6).map((item) => (
+            {displaySubjectMastery.slice(0, 6).map((item) => (
               <div key={item.subject} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="font-sans text-xs text-ink/80 font-medium truncate max-w-[60%]">{item.subject}</span>
