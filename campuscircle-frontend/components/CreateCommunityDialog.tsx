@@ -118,14 +118,14 @@ export const CreateCommunityDialog: React.FC<CreateCommunityDialogProps> = ({
             >
               New Community
             </h2>
-            <p className="font-sans text-xs text-ink/50 mt-0.5">
+            <p className="font-sans text-xs text-ink/75 mt-0.5">
               Visible to your university only
             </p>
           </div>
           <button
             onClick={onClose}
             aria-label="Close dialog"
-            className="p-2 rounded-xl hover:bg-background text-ink/50 hover:text-ink transition-colors cursor-pointer"
+            className="p-2 rounded-xl hover:bg-background text-ink/60 hover:text-ink transition-colors cursor-pointer"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -152,7 +152,7 @@ export const CreateCommunityDialog: React.FC<CreateCommunityDialogProps> = ({
               <div className="flex items-center justify-between">
                 <label
                   htmlFor="community-name"
-                  className="font-mono text-xs text-ink/60 font-semibold uppercase tracking-wide"
+                  className="font-mono text-xs text-ink/75 font-semibold uppercase tracking-wide"
                 >
                   Name <span className="text-red-500">*</span>
                 </label>
@@ -162,7 +162,7 @@ export const CreateCommunityDialog: React.FC<CreateCommunityDialogProps> = ({
                       ? "text-red-600"
                       : nameNearLimit
                       ? "text-accent"
-                      : "text-ink/30"
+                      : "text-ink/40"
                   }`}
                 >
                   {nameRemaining}
@@ -185,7 +185,7 @@ export const CreateCommunityDialog: React.FC<CreateCommunityDialogProps> = ({
                 }`}
                 disabled={isSubmitting}
               />
-              <p className="font-sans text-xs text-ink/40">
+              <p className="font-sans text-xs text-ink/70">
                 Must be unique within your university.
               </p>
             </div>

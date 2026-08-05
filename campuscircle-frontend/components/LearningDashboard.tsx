@@ -90,7 +90,7 @@ function SectionHeading({ icon, label }: { icon: React.ReactNode; label: string 
   return (
     <div className="flex items-center gap-2 mb-3">
       <span className="text-primary">{icon}</span>
-      <h3 className="font-display text-xs font-bold text-ink/80 uppercase tracking-wide">{label}</h3>
+      <h3 className="font-display text-xs font-bold text-ink/90 uppercase tracking-wide">{label}</h3>
     </div>
   );
 }
@@ -99,8 +99,8 @@ function StatChip({ label, value, sub }: { label: string; value: string; sub?: s
   return (
     <div className="bg-background border border-border-muted/70 rounded-xl p-3 flex flex-col gap-0.5">
       <span className="font-mono text-lg font-bold text-primary leading-none">{value}</span>
-      <span className="font-sans text-[11px] font-semibold text-ink/70 leading-tight">{label}</span>
-      {sub && <span className="font-mono text-[10px] text-ink/40">{sub}</span>}
+      <span className="font-sans text-[11px] font-semibold text-ink/80 leading-tight">{label}</span>
+      {sub && <span className="font-mono text-[10px] text-ink/60">{sub}</span>}
     </div>
   );
 }
@@ -129,7 +129,7 @@ function MasteryRing({ percent }: { percent: number }) {
           {Math.round(percent)}%
         </text>
       </svg>
-      <span className="font-sans text-[11px] text-ink/60 font-semibold">Overall Mastery</span>
+      <span className="font-sans text-[11px] text-ink/75 font-semibold">Overall Mastery</span>
     </div>
   );
 }

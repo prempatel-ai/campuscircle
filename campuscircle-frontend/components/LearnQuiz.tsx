@@ -387,11 +387,11 @@ export function LearnQuiz({ sessionId, onBackToExplanation, onQuizComplete }: Le
       )}
 
       {/* 3-Phase Tab Navigation Bar */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-4">
         {[
-          { num: 1, name: "Phase 1: Recall", data: quizSession.phase1, unlocked: true },
-          { num: 2, name: "Phase 2: Application", data: quizSession.phase2, unlocked: !!quizSession.phase2 },
-          { num: 3, name: "Phase 3: Synthesis", data: quizSession.phase3, unlocked: !!quizSession.phase3 },
+          { num: 1, name: "Recall", fullName: "Phase 1: Recall", data: quizSession.phase1, unlocked: true },
+          { num: 2, name: "Application", fullName: "Phase 2: Application", data: quizSession.phase2, unlocked: !!quizSession.phase2 },
+          { num: 3, name: "Synthesis", fullName: "Phase 3: Synthesis", data: quizSession.phase3, unlocked: !!quizSession.phase3 },
         ].map((tab) => {
           const isPassed = tab.data?.is_passed;
           const isActive = activePhase === tab.num;
@@ -401,32 +401,35 @@ export function LearnQuiz({ sessionId, onBackToExplanation, onQuizComplete }: Le
               key={tab.num}
               disabled={!tab.unlocked}
               onClick={() => setActivePhase(tab.num)}
-              className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[90px] ${
+              className={`p-2.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[84px] sm:min-h-[90px] ${
                 isActive
                   ? "bg-surface border-primary ring-2 ring-primary/20 shadow-xs"
                   : tab.unlocked
-                  ? "bg-surface border-border-muted hover:border-border-muted/80 opacity-80"
-                  : "bg-background border-border-muted/40 opacity-40 cursor-not-allowed"
+                  ? "bg-surface border-border-muted hover:border-border-muted/80 opacity-90"
+                  : "bg-background border-border-muted/40 opacity-50 cursor-not-allowed"
               }`}
             >
               <div className="flex items-center justify-between w-full">
-                <span className="font-mono text-xs font-bold text-ink/60">PHASE {tab.num}</span>
+                <span className="font-mono text-[10px] sm:text-xs font-bold text-ink/75">P{tab.num}</span>
                 {isPassed ? (
-                  <span className="w-5 h-5 bg-primary text-surface rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <span className="w-4 h-4 sm:w-5 sm:h-5 bg-primary text-surface rounded-full flex items-center justify-center shrink-0">
+                    <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </span>
                 ) : !tab.unlocked ? (
-                  <svg className="w-4 h-4 text-ink/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 text-ink/50 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                 ) : null}
               </div>
 
               <div>
-                <h4 className="font-display text-xs sm:text-sm font-bold text-ink truncate">{tab.name}</h4>
-                <p className="font-sans text-[11px] text-ink/60 truncate">
+                <h4 className="font-display text-xs sm:text-sm font-bold text-ink truncate">
+                  <span className="hidden sm:inline">{tab.fullName}</span>
+                  <span className="sm:hidden">{tab.name}</span>
+                </h4>
+                <p className="font-sans text-[10px] sm:text-[11px] text-ink/70 truncate">
                   {tab.unlocked ? (isPassed ? "Passed" : "Available") : "Locked"}
                 </p>
               </div>

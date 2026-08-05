@@ -107,6 +107,21 @@ body {
   animation: backdropFadeIn 180ms ease-out forwards;
 }
 
+/* Custom Scrollbar Utilities */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Keyboard Focus Accessibility */
+*:focus-visible {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 2px !important;
+}
+
 /* Accessibility: Disable all motion if OS prefers-reduced-motion is active */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {

@@ -137,7 +137,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
               <span className="font-mono text-xs text-accent font-semibold tracking-tight">
                 @{username}
               </span>
-              <span className="text-[9px] text-ink/40 font-sans">
+              <span className="text-[9px] text-ink/70 font-sans">
                 {relativeTime}
               </span>
             </div>
@@ -149,7 +149,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
           </p>
 
           {/* Footer Controls */}
-          <div className="flex items-center gap-4 text-xs font-semibold text-ink/65 pt-1">
+          <div className="flex items-center gap-4 text-xs font-semibold text-ink/75 pt-1">
             <VoteControl targetId={comment.id} targetType="comment" initialScore={comment.score} />
             <button
               onClick={() => setActiveReplyId(isReplying ? null : comment.id)}
@@ -160,7 +160,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
             <button
               onClick={() => setReportingCommentId(comment.id)}
               aria-label="Report comment"
-              className="ml-auto text-ink/30 hover:text-red-500 transition-colors cursor-pointer flex items-center gap-1"
+              className="ml-auto text-ink/50 hover:text-red-500 transition-colors cursor-pointer flex items-center gap-1"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />

@@ -221,7 +221,7 @@ export function SocraticDiscussion({ sessionId, lessonTitle }: SocraticDiscussio
                 </span>
               )}
             </div>
-            <p className="font-mono text-[11px] text-ink/50 mt-0.5">
+            <p className="font-mono text-[11px] text-ink/75 mt-0.5">
               {isConcluded
                 ? "Discussion complete"
                 : hasMsgs

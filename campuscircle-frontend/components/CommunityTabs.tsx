@@ -29,8 +29,8 @@ export const CommunityTabs: React.FC<CommunityTabsProps> = ({
   return (
     <>
       {/* ── 1. MOBILE / TABLET HORIZONTAL PILL TAB BAR (< lg) ── */}
-      <div className="w-full border-b border-border-muted/50 bg-background/95 backdrop-blur-md sticky top-[57px] z-10 lg:hidden">
-        <div className="max-w-2xl mx-auto flex items-center gap-2 overflow-x-auto px-4 py-3.5 no-scrollbar scroll-smooth">
+      <div className="w-full border-b border-border-muted/50 bg-background/95 backdrop-blur-md sticky top-14 z-10 lg:hidden">
+        <div className="max-w-2xl mx-auto flex items-center gap-2 overflow-x-auto px-4 py-2.5 no-scrollbar flex-nowrap scroll-smooth">
           {/* Community pills */}
           {communities.map((comm) => {
             const isSelected = comm.id === selectedId;
@@ -38,10 +38,10 @@ export const CommunityTabs: React.FC<CommunityTabsProps> = ({
               <button
                 key={comm.id}
                 onClick={() => onSelect(comm.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-sans whitespace-nowrap transition-all duration-200 cursor-pointer border shrink-0 ${
+                className={`px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-sans whitespace-nowrap transition-all duration-200 cursor-pointer border shrink-0 flex items-center ${
                   isSelected
-                    ? "bg-primary text-white font-extrabold border-primary shadow-xs"
-                    : "bg-surface text-ink/75 border-border-muted/70 hover:bg-surface-subtle hover:text-ink font-semibold shadow-2xs"
+                    ? "bg-primary text-surface font-extrabold border-primary shadow-xs"
+                    : "bg-surface text-ink/80 border-border-muted/70 hover:bg-surface-subtle hover:text-ink font-semibold shadow-2xs"
                 }`}
               >
                 #{comm.name}
@@ -54,7 +54,7 @@ export const CommunityTabs: React.FC<CommunityTabsProps> = ({
             id="new-community-btn"
             onClick={() => onRequestCreate?.()}
             aria-label="Create new community"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-sans font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer border border-dashed border-border-muted/80 text-ink/60 hover:border-primary/50 hover:text-primary hover:bg-primary/5 shrink-0 bg-surface/50"
+            className="flex items-center gap-1.5 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-sans font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer border border-dashed border-border-muted/80 text-ink/75 hover:border-primary/50 hover:text-primary hover:bg-primary/5 shrink-0 bg-surface/50"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />

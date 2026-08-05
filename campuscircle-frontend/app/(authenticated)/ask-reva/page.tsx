@@ -342,6 +342,21 @@ export default function AskRevaPage() {
                                       </pre>
                                     );
                                   },
+                                  table({children}) {
+                                    return (
+                                      <div className="overflow-x-auto my-3 max-w-full no-scrollbar rounded-xl border border-border-muted/80">
+                                        <table className="min-w-full divide-y divide-border-muted text-xs font-sans bg-surface">
+                                          {children}
+                                        </table>
+                                      </div>
+                                    );
+                                  },
+                                  th({children}) {
+                                    return <th className="px-3 py-2 bg-surface-subtle font-mono text-[11px] font-bold text-ink/80 text-left">{children}</th>;
+                                  },
+                                  td({children}) {
+                                    return <td className="px-3 py-2 border-t border-border-muted/50 text-ink/80 text-left">{children}</td>;
+                                  },
                                 }}
                               >
                                 {msg.text}
@@ -362,7 +377,7 @@ export default function AskRevaPage() {
                   {isSending && (
                     <div className="flex items-center gap-3 py-2">
                       <AnonAvatar username="reva" size={32} shape="circle" />
-                      <div className="text-xs font-sans text-ink/60 flex items-center gap-2">
+                      <div className="text-xs font-sans text-ink/75 flex items-center gap-2">
                         <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
                         <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0.2s]" />
                         <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0.4s]" />
@@ -379,7 +394,7 @@ export default function AskRevaPage() {
         </div>
 
         {/* 3. Floating Pill-Shaped Input Bar (Sticky at Bottom) */}
-        <div className="sticky bottom-4 w-full max-w-2xl mx-auto pt-2 bg-background/80 backdrop-blur-md">
+        <div className="sticky bottom-16 md:bottom-4 z-30 w-full max-w-2xl mx-auto pt-2 bg-background/80 backdrop-blur-md">
           {error && (
             <div className="mb-2 p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs font-sans text-red-700">
               {error}

@@ -16,6 +16,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -26,15 +27,25 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  // Close dropdown menu when clicking outside
+  // Close dropdown menu when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+        setIsMobileSearchOpen(false);
+      }
+    };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   if (isLoading || !isAuthenticated) {
@@ -57,21 +68,22 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       router.push(`/feed?search=${encodeURIComponent(searchQuery.trim())}`);
+      setIsMobileSearchOpen(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-background text-ink font-sans flex flex-col">
       {/* Shared Persistent Top Header */}
-      <header className="bg-surface border-b border-border-muted px-4 py-3 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-2 sm:px-4">
+      <header className="bg-surface border-b border-border-muted px-3 sm:px-4 py-2.5 sticky top-0 z-30 shadow-2xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-1 sm:px-4">
           {/* Logo & Main Nav */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
             <Link
               href="/feed"
               className="flex items-center gap-2 hover:opacity-90 transition-opacity shrink-0"
             >
-              <span className="font-display text-2xl font-bold tracking-tight text-primary">
+              <span className="font-display text-xl sm:text-2xl font-bold tracking-tight text-primary">
                 CampusCircle
               </span>
             </Link>
@@ -82,7 +94,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 className={`py-2 text-xs font-sans transition-all flex items-center gap-1.5 border-b-2 ${
                   pathname.startsWith("/feed")
                     ? "border-primary text-primary font-extrabold"
-                    : "border-transparent text-ink/60 hover:text-ink font-semibold"
+                    : "border-transparent text-ink/75 hover:text-ink font-semibold"
                 }`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,7 +107,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 className={`py-2 text-xs font-sans transition-all flex items-center gap-1.5 border-b-2 ${
                   pathname.startsWith("/learn")
                     ? "border-primary text-primary font-extrabold"
-                    : "border-transparent text-ink/60 hover:text-ink font-semibold"
+                    : "border-transparent text-ink/75 hover:text-ink font-semibold"
                 }`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,7 +120,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 className={`py-2 text-xs font-sans transition-all flex items-center gap-1.5 border-b-2 ${
                   pathname.startsWith("/ask-reva")
                     ? "border-primary text-primary font-extrabold"
-                    : "border-transparent text-ink/60 hover:text-ink font-semibold"
+                    : "border-transparent text-ink/75 hover:text-ink font-semibold"
                 }`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,10 +131,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             </nav>
           </div>
 
-          {/* Global Search Bar */}
+          {/* Desktop Global Search Bar */}
           <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md mx-4 hidden sm:block">
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ink/40">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ink/50">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
@@ -137,129 +149,176 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             </div>
           </form>
 
-          {/* Account Menu Dropdown */}
-          <div className="relative" ref={menuRef}>
+          {/* Right Header Actions */}
+          <div className="flex items-center gap-2">
+            {/* Mobile Search Toggle Button */}
             <button
-              onClick={() => setIsMenuOpen((prev) => !prev)}
-              aria-label="Account menu"
-              aria-expanded={isMenuOpen}
-              className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full border border-border-muted/60 bg-surface hover:bg-background transition-all cursor-pointer shadow-sm"
+              onClick={() => setIsMobileSearchOpen((prev) => !prev)}
+              aria-label="Toggle search bar"
+              className="sm:hidden p-2 rounded-full text-ink/75 hover:bg-background transition-colors cursor-pointer"
             >
-              <AnonAvatar username={avatarSeed} size={30} shape="circle" />
-              <svg
-                className={`w-4 h-4 text-ink/60 transition-transform duration-200 ${
-                  isMenuOpen ? "rotate-180" : ""
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
 
-            {/* Dropdown Menu */}
-            {isMenuOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-surface border border-border-muted rounded-2xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                {/* Account Details Header */}
-                <div className="px-4 py-3 border-b border-border-muted/50 flex items-center gap-3">
-                  <AnonAvatar username={avatarSeed} size={42} shape="circle" />
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-mono text-xs font-bold text-accent tracking-tight truncate">
-                      @{user?.username || "user"}
-                    </span>
-                    <span className="inline-block mt-0.5 text-[10px] font-mono font-bold uppercase tracking-wide bg-primary/10 text-primary px-2 py-0.5 rounded-full w-max">
-                      {user?.role === "admin" ? "Administrator" : "Student"}
-                    </span>
+            {/* Account Menu Dropdown */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setIsMenuOpen((prev) => !prev)}
+                aria-label="Account menu"
+                aria-expanded={isMenuOpen}
+                aria-haspopup="true"
+                className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full border border-border-muted/60 bg-surface hover:bg-background transition-all cursor-pointer shadow-2xs"
+              >
+                <AnonAvatar username={avatarSeed} size={30} shape="circle" />
+                <svg
+                  className={`w-4 h-4 text-ink/75 transition-transform duration-200 ${
+                    isMenuOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Dropdown Menu */}
+              {isMenuOpen && (
+                <div
+                  role="menu"
+                  aria-orientation="vertical"
+                  className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-surface border border-border-muted rounded-2xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                >
+                  {/* Account Details Header */}
+                  <div className="px-4 py-3 border-b border-border-muted/50 flex items-center gap-3">
+                    <AnonAvatar username={avatarSeed} size={42} shape="circle" />
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-mono text-xs font-bold text-accent tracking-tight truncate">
+                        @{user?.username || "user"}
+                      </span>
+                      <span className="inline-block mt-0.5 text-[10px] font-mono font-bold uppercase tracking-wide bg-primary/10 text-primary px-2 py-0.5 rounded-full w-max">
+                        {user?.role === "admin" ? "Administrator" : "Student"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Navigation Links */}
+                  <div className="py-1">
+                    <Link
+                      href="/feed"
+                      role="menuitem"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                      </svg>
+                      Community Feed
+                    </Link>
+                    <Link
+                      href="/learn"
+                      role="menuitem"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      Learn (AI Prep)
+                    </Link>
+                    <Link
+                      href="/ask-reva"
+                      role="menuitem"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                      </svg>
+                      Ask Reva AI
+                    </Link>
+                    <Link
+                      href="/my-posts"
+                      role="menuitem"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      My Activity & Posts
+                    </Link>
+                    <Link
+                      href="/settings"
+                      role="menuitem"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Account Settings
+                    </Link>
+                    <a
+                      href="mailto:rolexhere03@gmail.com?subject=CampusCircle%20Issue%20Report"
+                      role="menuitem"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      Report an Issue
+                    </a>
+                  </div>
+
+                  {/* Install App */}
+                  <div className="border-t border-border-muted/50 pt-1 mt-1">
+                    <InstallPrompt variant="dropdown" />
+                  </div>
+
+                  {/* Logout Item */}
+                  <div className="border-t border-border-muted/50 pt-1 mt-1">
+                    <button
+                      role="menuitem"
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-red-600 hover:bg-red-50 transition-colors text-left cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Log Out
+                    </button>
                   </div>
                 </div>
-
-                {/* Navigation Links */}
-                <div className="py-1">
-                  <Link
-                    href="/feed"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                    </svg>
-                    Community Feed
-                  </Link>
-                  <Link
-                    href="/learn"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                    Learn (AI Prep)
-                  </Link>
-                  <Link
-                    href="/ask-reva"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                    </svg>
-                    Ask Reva AI
-                  </Link>
-                  <Link
-                    href="/my-posts"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    My Activity & Posts
-                  </Link>
-                  <Link
-                    href="/settings"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Account Settings
-                  </Link>
-                  <a
-                    href="mailto:rolexhere03@gmail.com?subject=CampusCircle%20Issue%20Report"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    Report an Issue
-                  </a>
-                </div>
-
-                {/* Install App */}
-                <div className="border-t border-border-muted/50 pt-1 mt-1">
-                  <InstallPrompt variant="dropdown" />
-                </div>
-
-                {/* Logout Item */}
-                <div className="border-t border-border-muted/50 pt-1 mt-1">
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-red-600 hover:bg-red-50 transition-colors text-left cursor-pointer"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Log Out
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Collapsible Mobile Search Overlay Bar */}
+        {isMobileSearchOpen && (
+          <div className="sm:hidden px-4 pb-3 pt-1 border-t border-border-muted/40 bg-surface animate-in slide-in-from-top-1 duration-150">
+            <form onSubmit={handleSearchSubmit} className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-ink/50">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search topics, posts, or communities..."
+                className="w-full pl-10 pr-4 py-2 bg-background border border-border-muted rounded-full text-xs text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </form>
+          </div>
+        )}
       </header>
 
       {/* Main Page Children Container */}
@@ -269,13 +328,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       <InstallPrompt variant="banner" />
 
       {/* Persistent Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border-muted/80 px-4 py-1.5 flex items-center justify-around shadow-lg">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-surface/95 backdrop-blur-md border-t border-border-muted/80 px-2 py-1 flex items-center justify-around shadow-lg">
         <Link
           href="/feed"
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-3 text-[11px] font-sans transition-all border-t-2 ${
+          className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 min-h-[44px] text-[11px] font-sans transition-all border-t-2 ${
             pathname.startsWith("/feed")
               ? "text-primary font-extrabold border-primary -mt-[2px]"
-              : "text-ink/60 font-semibold border-transparent hover:text-ink"
+              : "text-ink/75 font-semibold border-transparent hover:text-ink"
           }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,10 +345,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
         <Link
           href="/learn"
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-3 text-[11px] font-sans transition-all border-t-2 ${
+          className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 min-h-[44px] text-[11px] font-sans transition-all border-t-2 ${
             pathname.startsWith("/learn")
               ? "text-primary font-extrabold border-primary -mt-[2px]"
-              : "text-ink/60 font-semibold border-transparent hover:text-ink"
+              : "text-ink/75 font-semibold border-transparent hover:text-ink"
           }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,10 +359,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
         <Link
           href="/ask-reva"
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-3 text-[11px] font-sans transition-all border-t-2 ${
+          className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 min-h-[44px] text-[11px] font-sans transition-all border-t-2 ${
             pathname.startsWith("/ask-reva")
               ? "text-primary font-extrabold border-primary -mt-[2px]"
-              : "text-ink/60 font-semibold border-transparent hover:text-ink"
+              : "text-ink/75 font-semibold border-transparent hover:text-ink"
           }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -314,10 +373,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
         <Link
           href="/my-posts"
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-3 text-[11px] font-sans transition-all border-t-2 ${
+          className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 min-h-[44px] text-[11px] font-sans transition-all border-t-2 ${
             pathname.startsWith("/my-posts") || pathname.startsWith("/settings")
               ? "text-primary font-extrabold border-primary -mt-[2px]"
-              : "text-ink/60 font-semibold border-transparent hover:text-ink"
+              : "text-ink/75 font-semibold border-transparent hover:text-ink"
           }`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

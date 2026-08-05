@@ -310,15 +310,15 @@ function FeedContent() {
 
         {/* Feed Sort Tabs */}
         {!isCommunitiesLoading && !searchQueryParam && (communities.length > 0 || sort === "for-you") && !error && (
-          <div className="flex bg-surface-subtle p-1 rounded-2xl border border-border-muted/70 w-full shadow-2xs">
+          <div className="flex bg-surface-subtle p-1 rounded-2xl border border-border-muted/70 w-full shadow-2xs overflow-x-auto no-scrollbar flex-nowrap">
             {SORT_OPTIONS.map((s) => (
               <button
                 key={s}
                 onClick={() => setSort(s)}
-                className={`flex-1 py-1.5 text-xs font-sans capitalize rounded-xl transition-all cursor-pointer whitespace-nowrap text-center px-2 ${
+                className={`flex-1 py-2 text-xs font-sans capitalize rounded-xl transition-all cursor-pointer whitespace-nowrap text-center px-3 min-h-[36px] ${
                   sort === s
                     ? "bg-surface text-primary font-extrabold shadow-2xs border border-border-muted/50"
-                    : "text-ink/60 font-semibold hover:text-ink"
+                    : "text-ink/75 font-semibold hover:text-ink"
                 }`}
               >
                 {s === "for-you" ? "For You" : s}
@@ -326,6 +326,11 @@ function FeedContent() {
             ))}
           </div>
         )}
+
+        {/* Mobile Trending Tags Bar (< lg) */}
+        <div className="lg:hidden">
+          <TrendingTags activeTag={tagQueryParam} onSelectTag={handleSelectTag} />
+        </div>
 
         {/* Post List */}
         {!isCommunitiesLoading && !error && (
@@ -393,7 +398,7 @@ function FeedContent() {
       <button
         onClick={() => setIsComposing(true)}
         aria-label="Create new post"
-        className="md:hidden fixed right-4 bottom-20 z-40 w-12 h-12 bg-primary hover:bg-[#1F3E23] text-surface rounded-full shadow-xl flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
+        className="md:hidden fixed right-4 bottom-20 z-35 w-12 h-12 bg-primary hover:bg-[#1F3E23] text-surface rounded-full shadow-xl flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />

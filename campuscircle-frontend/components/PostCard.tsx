@@ -127,7 +127,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                   />
                 )}
               </div>
-              <span className="text-[10px] text-ink/40 font-sans tracking-wide">
+              <span className="text-[10px] text-ink/70 font-sans tracking-wide">
                 {relativeTime}
               </span>
             </div>
@@ -153,7 +153,7 @@ export const PostCard: React.FC<PostCardProps> = ({
               onClick={() => setReporting(true)}
               aria-label="Report post"
               title="Report post"
-              className="p-1.5 rounded-lg text-ink/30 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-ink/50 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
@@ -167,13 +167,13 @@ export const PostCard: React.FC<PostCardProps> = ({
           <h3 className="font-display text-lg font-bold text-ink group-hover:text-primary transition-colors leading-snug">
             {renderWithHashtags(post.title)}
           </h3>
-          <p className="font-sans text-sm text-ink/75 leading-relaxed break-words whitespace-pre-wrap line-clamp-4">
+          <p className="font-sans text-sm text-ink/80 leading-relaxed break-words whitespace-pre-wrap line-clamp-4">
             {renderWithHashtags(post.content)}
           </p>
         </Link>
 
         {/* Interaction Bar */}
-        <div className="flex items-center justify-between pt-1.5 border-t border-border-muted/50 text-ink/60">
+        <div className="flex items-center justify-between pt-1.5 border-t border-border-muted/50 text-ink/75">
           <div className="flex items-center gap-5">
             {/* Score Control */}
             <VoteControl targetId={post.id} targetType="post" initialScore={post.score} />
