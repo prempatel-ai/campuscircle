@@ -52,6 +52,10 @@ from src.schemas.learn import (
     LessonChatMessageOut,
     LearningDashboardOut,
     WeeklyLearningReportOut,
+    SocraticMessageOut,
+    SocraticRespondIn,
+    SocraticRespondOut,
+    SocraticStatusOut,
 )
 from src.services.learning_profile_service import (
     get_or_create_learning_profile,
@@ -1233,5 +1237,99 @@ async def send_lesson_chat_followup(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
+# ── Socratic Discussion endpoints ───────────────────────────────────────────
+
+from src.services.socratic_discussion_service import (
+    get_socratic_messages,
+    start_socratic_discussion,
+    respond_to_socratic,
+)
 
 
+@router.get(
+    "/{session_id}/socratic/messages",
+    response_model=SocraticStatusOut,
+    status_code=status.HTTP_200_OK,
+    summary="Get Socratic discussion status and message history for a session",
+)
+async def get_socratic_status(
+    session_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns all Socratic discussion messages and whether the discussion has concluded."""
+    user_uuid = uuid.UUID(current_user["user_id"])
+    from sqlalchemy import select as sa_select
+    from src.models.learning_session import LearningSession
+    try:
+        messages = await get_socratic_messages(db=db, session_id=session_id, user_id=user_uuid)
+        # Fetch session for conclusion status
+        sess_res = await db.execute(
+            sa_select(LearningSession).where(
+                LearningSession.id == session_id,
+                LearningSession.user_id == user_uuid
+            )
+        )
+        sess = sess_res.scalar_one_or_none()
+        return SocraticStatusOut(
+            session_id=session_id,
+            is_concluded=sess.socratic_concluded if sess else False,
+            understanding_level=sess.socratic_understanding_level if sess else None,
+            exchange_count=sum(1 for m in messages if m.sender == "user"),
+            messages=messages,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post(
+    "/{session_id}/socratic/start",
+    response_model=SocraticMessageOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Start the Socratic discussion — Reva generates the first question",
+)
+async def start_socratic(
+    session_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generates and stores Reva's first Socratic question for this session.
+    Idempotent — calling it again returns the existing first message.
+    """
+    user_uuid = uuid.UUID(current_user["user_id"])
+    try:
+        msg = await start_socratic_discussion(db=db, session_id=session_id, user_id=user_uuid)
+        return msg
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post(
+    "/{session_id}/socratic/respond",
+    response_model=SocraticRespondOut,
+    status_code=status.HTTP_200_OK,
+    summary="Send student response in Socratic discussion",
+)
+async def respond_socratic(
+    session_id: uuid.UUID,
+    payload: SocraticRespondIn,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Processes the student's reply. Reva evaluates understanding, may ask a
+    follow-up question or conclude naturally. On conclusion, updates
+    StudentLearningProfile and UserLearningMemory.
+    """
+    user_uuid = uuid.UUID(current_user["user_id"])
+    try:
+        result = await respond_to_socratic(
+            db=db,
+            session_id=session_id,
+            user_id=user_uuid,
+            student_text=payload.student_text,
+        )
+        return SocraticRespondOut(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

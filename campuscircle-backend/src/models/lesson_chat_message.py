@@ -21,6 +21,9 @@ class LessonChatMessage(Base):
 
     sender: Mapped[str] = mapped_column(String(16), nullable=False)  # "user" or "reva"
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    discussion_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="lesson_chat"  # "lesson_chat" | "socratic"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True

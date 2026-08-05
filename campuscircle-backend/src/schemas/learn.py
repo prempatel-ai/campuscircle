@@ -260,3 +260,36 @@ class WeeklyLearningReportOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ── Socratic Discussion schemas ──────────────────────────────────────────────
+
+class SocraticMessageOut(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    sender: str          # "reva" | "user"
+    content: str
+    discussion_type: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SocraticRespondIn(BaseModel):
+    student_text: str = Field(..., min_length=1, max_length=2000,
+                               description="Student's response in the Socratic discussion")
+
+
+class SocraticRespondOut(BaseModel):
+    message: SocraticMessageOut
+    is_concluded: bool
+    understanding_level: Optional[str] = None  # "strong" | "adequate" | "developing" | "needs_review"
+
+
+class SocraticStatusOut(BaseModel):
+    session_id: uuid.UUID
+    is_concluded: bool
+    understanding_level: Optional[str] = None
+    exchange_count: int
+    messages: List[SocraticMessageOut] = Field(default_factory=list)

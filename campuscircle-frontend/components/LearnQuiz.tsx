@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { apiRequest, ApiError } from "@/lib/api";
+import { SocraticDiscussion } from "@/components/SocraticDiscussion";
 
 interface Question {
   id: string;
@@ -318,6 +319,14 @@ export function LearnQuiz({ sessionId, onBackToExplanation, onQuizComplete }: Le
             You've successfully passed all 3 phases (Recall, Application, and Synthesis) for this topic.
           </p>
         </div>
+      )}
+
+      {/* Socratic Follow-up Discussion — shown after full quiz completion */}
+      {isCompleted && (
+        <SocraticDiscussion
+          sessionId={sessionId}
+          lessonTitle={quizSession.video_title}
+        />
       )}
 
       {/* Reva AI Post-Session Mentor Summary Banner */}

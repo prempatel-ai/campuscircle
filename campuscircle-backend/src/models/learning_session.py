@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, func, JSON
+from sqlalchemy import String, Text, DateTime, ForeignKey, func, JSON, Boolean
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -40,7 +40,13 @@ class LearningSession(Base):
     remediation_data: Mapped[dict | None] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=True
     )
-    
+
+    # Socratic discussion outcome
+    socratic_concluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    socratic_understanding_level: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # understanding levels: "strong" | "adequate" | "developing" | "needs_review"
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+
