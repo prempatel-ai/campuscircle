@@ -9,36 +9,30 @@ interface InteractiveVisualProps {
 
 export function InteractiveVisual({ visualHtml, title }: InteractiveVisualProps) {
   const instanceId = useId().replace(/:/g, "_");
-  const [iframeHeight, setIframeHeight] = useState<number>(280);
+  const [iframeHeight, setIframeHeight] = useState<number>(300);
 
-  // Injected height reporter script that measures scrollHeight and posts message to parent window
+  // Injected height reporter script: measures inner card/content element height (NOT window or html document height)
   const injectedScript = `
     <script>
       (function() {
+        var lastSentHeight = 0;
         function sendHeight() {
           try {
-            var body = document.body;
-            var html = document.documentElement;
-            var h = Math.max(
-              body ? body.scrollHeight : 0,
-              body ? body.offsetHeight : 0,
-              html ? html.clientHeight : 0,
-              html ? html.scrollHeight : 0,
-              html ? html.offsetHeight : 0
-            );
-            if (h > 0) {
+            var target = document.querySelector('.card') || document.body.firstElementChild || document.body;
+            var rect = target.getBoundingClientRect();
+            var h = Math.ceil(rect.height) + 12;
+            if (h > 50 && Math.abs(h - lastSentHeight) > 8) {
+              lastSentHeight = h;
               window.parent.postMessage({ type: 'VISUAL_HEIGHT', instanceId: '${instanceId}', height: h }, '*');
             }
           } catch(e) {}
         }
         window.addEventListener('load', sendHeight);
-        window.addEventListener('resize', sendHeight);
         document.addEventListener('DOMContentLoaded', sendHeight);
-        if (typeof ResizeObserver !== 'undefined' && document.body) {
-          try { new ResizeObserver(sendHeight).observe(document.body); } catch(e) {}
-        }
-        setTimeout(sendHeight, 100);
-        setTimeout(sendHeight, 400);
+        document.addEventListener('input', sendHeight);
+        document.addEventListener('click', sendHeight);
+        setTimeout(sendHeight, 150);
+        setTimeout(sendHeight, 500);
       })();
     </script>
   `;
@@ -61,8 +55,14 @@ export function InteractiveVisual({ visualHtml, title }: InteractiveVisualProps)
         typeof event.data.height === "number" &&
         event.data.height > 0
       ) {
-        // Add 16px buffer to avoid any clipping
-        setIframeHeight(event.data.height + 16);
+        // Clamp height safely between 240px and 520px max to prevent any infinite expansion loops
+        const clamped = Math.min(Math.max(event.data.height, 240), 520);
+        setIframeHeight((prev) => {
+          if (Math.abs(prev - clamped) > 10) {
+            return clamped;
+          }
+          return prev;
+        });
       }
     }
 
