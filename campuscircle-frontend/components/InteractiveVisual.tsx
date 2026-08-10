@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useId, useMemo } from "react";
 
 interface InteractiveVisualProps {
   visualHtml: string;
@@ -8,6 +8,68 @@ interface InteractiveVisualProps {
 }
 
 export function InteractiveVisual({ visualHtml, title }: InteractiveVisualProps) {
+  const instanceId = useId().replace(/:/g, "_");
+  const [iframeHeight, setIframeHeight] = useState<number>(280);
+
+  // Injected height reporter script that measures scrollHeight and posts message to parent window
+  const injectedScript = `
+    <script>
+      (function() {
+        function sendHeight() {
+          try {
+            var body = document.body;
+            var html = document.documentElement;
+            var h = Math.max(
+              body ? body.scrollHeight : 0,
+              body ? body.offsetHeight : 0,
+              html ? html.clientHeight : 0,
+              html ? html.scrollHeight : 0,
+              html ? html.offsetHeight : 0
+            );
+            if (h > 0) {
+              window.parent.postMessage({ type: 'VISUAL_HEIGHT', instanceId: '${instanceId}', height: h }, '*');
+            }
+          } catch(e) {}
+        }
+        window.addEventListener('load', sendHeight);
+        window.addEventListener('resize', sendHeight);
+        document.addEventListener('DOMContentLoaded', sendHeight);
+        if (typeof ResizeObserver !== 'undefined' && document.body) {
+          try { new ResizeObserver(sendHeight).observe(document.body); } catch(e) {}
+        }
+        setTimeout(sendHeight, 100);
+        setTimeout(sendHeight, 400);
+      })();
+    </script>
+  `;
+
+  // Inject height reporter script into visualHtml before </body> or at the end
+  const preparedHtml = useMemo(() => {
+    if (!visualHtml) return "";
+    if (visualHtml.includes("</body>")) {
+      return visualHtml.replace("</body>", `${injectedScript}</body>`);
+    }
+    return visualHtml + injectedScript;
+  }, [visualHtml, instanceId]);
+
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (
+        event.data &&
+        event.data.type === "VISUAL_HEIGHT" &&
+        event.data.instanceId === instanceId &&
+        typeof event.data.height === "number" &&
+        event.data.height > 0
+      ) {
+        // Add 16px buffer to avoid any clipping
+        setIframeHeight(event.data.height + 16);
+      }
+    }
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [instanceId]);
+
   if (!visualHtml) return null;
 
   return (
@@ -29,13 +91,15 @@ export function InteractiveVisual({ visualHtml, title }: InteractiveVisualProps)
       <div className="w-full rounded-xl overflow-hidden border border-border-muted/60 bg-surface shadow-inner">
         <iframe
           title={title || "Interactive Concept Visual"}
-          srcDoc={visualHtml}
+          srcDoc={preparedHtml}
           /* SECURITY REQUIREMENT: sandbox="allow-scripts" ONLY.
              Explicitly NO allow-same-origin, NO allow-top-navigation, NO allow-popups, NO allow-forms.
-             This ensures JS executes isolated inside the iframe with zero access to window.parent, cookies, localStorage, or JWTs.
+             Dynamic height auto-resizing is handled securely via postMessage.
           */
           sandbox="allow-scripts"
-          className="w-full h-[260px] sm:h-[320px] border-0 block bg-transparent"
+          scrolling="no"
+          style={{ height: `${iframeHeight}px`, overflow: "hidden" }}
+          className="w-full border-0 block bg-transparent transition-[height] duration-200"
         />
       </div>
     </div>
