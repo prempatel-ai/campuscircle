@@ -84,8 +84,8 @@ YOUTUBE_REGEX = re.compile(
     r'(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})'
 )
 
-EXTRACTION_DAILY_LIMIT = 10
-EXPLAIN_DAILY_LIMIT = 5
+EXTRACTION_DAILY_LIMIT = 999999  # Disabled for testing
+EXPLAIN_DAILY_LIMIT = 999999  # Disabled for testing
 
 SUPPORTED_LANGUAGES = {
     "en": "English",
