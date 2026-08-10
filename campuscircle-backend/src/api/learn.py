@@ -341,6 +341,43 @@ def validate_and_sanitize_visual_html(html_str: str) -> Tuple[bool, Optional[str
     return True, clean_str
 
 
+def validate_visual_quality_check(html_str: str) -> bool:
+    """
+    Programmatically verifies that generated visual HTML meets quality criteria:
+    1. Contains at least one <input type="range"> (continuous control, not just buttons)
+    2. Contains an <svg> element
+    3. Contains JS code handling live updates (oninput, addEventListener, requestAnimationFrame, or update())
+    """
+    if not html_str or not isinstance(html_str, str):
+        return False
+
+    lower_str = html_str.lower()
+
+    # 1. Must contain continuous range slider
+    has_slider = bool(re.search(r'<input[^>]+type\s*=\s*["\']range["\']', lower_str))
+    if not has_slider:
+        return False
+
+    # 2. Must contain SVG diagram
+    has_svg = "<svg" in lower_str
+    if not has_svg:
+        return False
+
+    # 3. Must contain JS update logic
+    has_js_update = any(k in lower_str for k in [
+        "addeventlistener",
+        "oninput",
+        "requestanimationframe",
+        "function update",
+        "const update",
+        "let update"
+    ])
+    if not has_js_update:
+        return False
+
+    return True
+
+
 def parse_and_validate_chunks(content_str: str) -> List[dict] | None:
     try:
         data = json.loads(content_str)
@@ -353,8 +390,9 @@ def parse_and_validate_chunks(content_str: str) -> List[dict] | None:
                     raw_html = c.get("visual_html")
                     clean_html = None
                     if has_vis and raw_html:
-                        is_valid, sanitized = validate_and_sanitize_visual_html(str(raw_html))
-                        if is_valid:
+                        is_valid_sec, sanitized = validate_and_sanitize_visual_html(str(raw_html))
+                        is_valid_qual = validate_visual_quality_check(sanitized) if is_valid_sec else False
+                        if is_valid_sec and is_valid_qual:
                             clean_html = sanitized
                         else:
                             has_vis = False
@@ -406,18 +444,36 @@ _MOCK_PHYSICS_VISUAL = """<!DOCTYPE html>
 <head>
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline';">
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; background: #FAF9F6; color: #1C2826; margin: 0; padding: 14px; box-sizing: border-box; }
-    .card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    :root {
+      --background: #FAF9F6;
+      --surface: #FFFFFF;
+      --primary: #2F5233;
+      --accent: #E8A33D;
+      --ink: #1C2826;
+      --border: #E2E8F0;
+    }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--background); color: var(--ink); margin: 0; padding: 14px; box-sizing: border-box; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .title { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 13px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em; }
     .controls { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-    .control-group { flex: 1; min-width: 130px; }
-    label { font-size: 12px; font-weight: 700; color: #2F5233; display: block; margin-bottom: 4px; }
-    input[type=range] { width: 100%; accent-color: #2F5233; }
-    .readout { display: flex; justify-content: space-between; background: #F1F5F9; border-radius: 8px; padding: 8px 12px; font-family: monospace; font-size: 12px; font-weight: 700; margin-top: 10px; color: #2F5233; }
-    svg { width: 100%; height: 110px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; }
+    .control-group { flex: 1; min-width: 140px; }
+    label { font-size: 12px; font-weight: 700; color: var(--primary); display: block; margin-bottom: 4px; }
+    input[type=range] { width: 100%; accent-color: var(--primary); cursor: pointer; }
+    .actions { display: flex; gap: 8px; margin-top: 8px; }
+    .btn { background: var(--primary); color: #FFFFFF; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.9; }
+    .btn-accent { background: var(--accent); color: #1C2826; }
+    .readout { display: flex; justify-content: space-between; align-items: center; background: #F1F5F9; border-radius: 8px; padding: 10px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 700; margin-top: 12px; color: var(--primary); border: 1px solid var(--border); }
+    svg { width: 100%; height: 120px; background: #F8FAFC; border-radius: 8px; border: 1px solid var(--border); }
   </style>
 </head>
 <body>
   <div class="card">
+    <div class="header">
+      <span class="title">Newton's Second Law Interactive Demo</span>
+      <span style="font-size:11px; color:#64748B;">Formula: F = m · a</span>
+    </div>
     <div class="controls">
       <div class="control-group">
         <label>Force (F): <span id="fVal">10</span> N</label>
@@ -428,19 +484,23 @@ _MOCK_PHYSICS_VISUAL = """<!DOCTYPE html>
         <input type="range" id="mRange" min="1" max="20" value="5">
       </div>
     </div>
-    <svg id="simSvg" viewBox="0 0 400 110">
+    <svg id="simSvg" viewBox="0 0 400 120">
       <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#E11D48"/>
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#E8A33D"/>
         </marker>
       </defs>
-      <line x1="20" y1="85" x2="380" y2="85" stroke="#94A3B8" stroke-width="2" />
-      <rect id="box" x="40" y="45" width="40" height="40" rx="6" fill="#2F5233" />
-      <text id="boxText" x="60" y="69" fill="#FFFFFF" font-size="11" font-weight="bold" text-anchor="middle">5kg</text>
-      <line id="forceArrow" x1="80" y1="65" x2="130" y2="65" stroke="#E11D48" stroke-width="3" marker-end="url(#arrow)" />
+      <line x1="20" y1="90" x2="380" y2="90" stroke="#94A3B8" stroke-width="2" />
+      <rect id="box" x="40" y="50" width="40" height="40" rx="6" fill="#2F5233" />
+      <text id="boxText" x="60" y="74" fill="#FFFFFF" font-size="11" font-weight="bold" text-anchor="middle">5kg</text>
+      <line id="forceArrow" x1="80" y1="70" x2="130" y2="70" stroke="#E8A33D" stroke-width="3" marker-end="url(#arrow)" />
     </svg>
+    <div class="actions">
+      <button class="btn" id="pushBtn">Apply Push Force</button>
+      <button class="btn btn-accent" id="resetBtn">Reset Demo</button>
+    </div>
     <div class="readout">
-      <span>Formula: a = F / m</span>
+      <span>Equation: a = F / m</span>
       <span>Acceleration (a): <span id="aVal">2.00</span> m/s²</span>
     </div>
   </div>
@@ -450,8 +510,14 @@ _MOCK_PHYSICS_VISUAL = """<!DOCTYPE html>
     const fVal = document.getElementById('fVal');
     const mVal = document.getElementById('mVal');
     const aVal = document.getElementById('aVal');
+    const box = document.getElementById('box');
     const boxText = document.getElementById('boxText');
     const forceArrow = document.getElementById('forceArrow');
+    const pushBtn = document.getElementById('pushBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let posX = 40;
+    let animId = null;
 
     function update() {
       const F = parseFloat(fRange.value);
@@ -462,8 +528,34 @@ _MOCK_PHYSICS_VISUAL = """<!DOCTYPE html>
       aVal.textContent = a;
       boxText.textContent = m + 'kg';
       const arrowLen = Math.min(120, 20 + F * 2.0);
-      forceArrow.setAttribute('x2', 80 + arrowLen);
+      forceArrow.setAttribute('x1', posX + 40);
+      forceArrow.setAttribute('x2', posX + 40 + arrowLen);
+      box.setAttribute('x', posX);
+      boxText.setAttribute('x', posX + 20);
     }
+
+    function animate() {
+      const F = parseFloat(fRange.value);
+      const m = parseFloat(mRange.value);
+      const a = F / m;
+      if (posX < 300) {
+        posX += Math.min(10, a * 0.8);
+        update();
+        animId = requestAnimationFrame(animate);
+      }
+    }
+
+    pushBtn.addEventListener('click', () => {
+      cancelAnimationFrame(animId);
+      animate();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      cancelAnimationFrame(animId);
+      posX = 40;
+      update();
+    });
+
     fRange.addEventListener('input', update);
     mRange.addEventListener('input', update);
     update();
@@ -526,8 +618,19 @@ async def call_groq_api_for_explanation(
         "FOR EACH CHUNK, EVALUATE VISUAL SUITABILITY:\n"
         "- Decide if an interactive visual simulation (HTML + inline SVG + vanilla JS with controls like sliders or buttons driving live readouts and animated SVG diagram attributes) WOULD MEANINGFULLY HELP teach this specific concept.\n"
         "- ONLY generate a visual for STEM, physics, math, engineering, algorithms, or data structure concepts where an interactive visual genuinely aids understanding (e.g. force + mass sliders driving a live acceleration readout and animated SVG box, or interactive step visualizer).\n"
-        "- DO NOT force a visual on non-visualizable chunks (e.g. historical background, philosophical context, definitions, introductory summaries). For non-visual chunks, set 'has_visual': false and 'visual_html': null.\n"
-        "- FOR QUALIFYING CHUNKS: set 'has_visual': true and provide a self-contained string in 'visual_html' containing complete HTML, inline CSS, inline SVG, and plain vanilla JS script. NO external scripts (<script src=...), NO network calls (fetch/XHR), NO external links, NO markdown formatting inside the string. The visual MUST include labeled input controls (sliders or buttons), an SVG diagram, a live readout, and plain JS updating SVG attributes dynamically.\n\n"
+        "- DO NOT force a visual on non-visualizable chunks (e.g. historical background, philosophical context, definitions, introductory summaries). For non-visual chunks, set 'has_visual': false and 'visual_html': null.\n\n"
+        "FOR QUALIFYING CHUNKS (has_visual: true):\n"
+        "- Generate a complete self-contained HTML string in 'visual_html'.\n"
+        "- MUST USE CAMPUSCIRCLE DESIGN TOKENS IN INLINE CSS:\n"
+        "  :root { --background: #FAF9F6; --surface: #FFFFFF; --primary: #2F5233; --accent: #E8A33D; --ink: #1C2826; --border: #E2E8F0; }\n"
+        "- MUST MATCH THIS EXACT STRUCTURAL PATTERN:\n"
+        "  1. Continuous range sliders (<input type='range'>) for every adjustable physical/mathematical variable.\n"
+        "  2. An SVG diagram (<svg>) with dynamic attributes or vectors (e.g. moving box, changing arrows/colors).\n"
+        "  3. A live formula readout box displaying exact mathematical equations and correct physical units (e.g. 'a = F / m', 'Acceleration (a): 2.00 m/s²', 'Force: 10 N', 'Mass: 5 kg'). NEVER label force/newtons as acceleration!\n"
+        "  4. Optional push / action / reset buttons.\n"
+        "  5. Plain vanilla JS update functions listening to 'input' events on range sliders.\n\n"
+        "REFERENCE STRUCTURAL TEMPLATE TO FOLLOW:\n"
+        f"{_MOCK_PHYSICS_VISUAL}\n\n"
         "Return a JSON object with a single top-level key 'chunks' — a list where each item has exact keys: 'title', 'explanation', 'has_visual' (boolean), and 'visual_html' (string or null)."
     )
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -543,12 +646,38 @@ async def call_groq_api_for_explanation(
     }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
-        for _ in range(2):
+        for attempt in range(2):
             res = await client.post(url, headers=headers, json=payload)
             if res.status_code == 200:
-                parsed = parse_and_validate_chunks(res.json()["choices"][0]["message"]["content"])
+                content_text = res.json()["choices"][0]["message"]["content"]
+                parsed = parse_and_validate_chunks(content_text)
                 if parsed:
-                    return parsed
+                    # Check if any chunk intended to have a visual was rejected by quality/security check
+                    try:
+                        raw_json_chunks = json.loads(content_text).get("chunks", [])
+                    except Exception:
+                        raw_json_chunks = []
+
+                    needs_quality_retry = False
+                    for idx, r_chunk in enumerate(raw_json_chunks):
+                        if isinstance(r_chunk, dict) and r_chunk.get("has_visual"):
+                            if idx < len(parsed) and not parsed[idx]["has_visual"]:
+                                needs_quality_retry = True
+                                break
+
+                    if not needs_quality_retry or attempt == 1:
+                        return parsed
+
+                    # On attempt 0 quality failure, append stricter reminder prompt and retry once
+                    payload["messages"].append({"role": "assistant", "content": content_text})
+                    payload["messages"].append({
+                        "role": "user",
+                        "content": (
+                            "QUALITY CHECK FAILED: Your generated visual lacked continuous range sliders (<input type='range'>), "
+                            "an <svg> diagram, or live JS event listeners. Please regenerate the JSON chunks following the "
+                            "REFERENCE STRUCTURAL TEMPLATE with continuous sliders for all variables, an SVG diagram, formula readout, and correct physical units."
+                        )
+                    })
 
     raise HTTPException(status_code=422, detail="AI model failed to generate a structured explanation. Please try again.")
 

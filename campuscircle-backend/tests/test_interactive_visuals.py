@@ -69,7 +69,7 @@ def test_parse_and_validate_chunks_with_visual():
                 "title": "Interactive STEM Chunk",
                 "explanation": "Newton's force simulation",
                 "has_visual": true,
-                "visual_html": "<html><body><svg><rect width='10' height='10'/></svg><script>let a=1;</script></body></html>"
+                "visual_html": "<html><body><input type='range' id='f'/><svg><rect width='10' height='10'/></svg><script>const f=document.getElementById('f'); f.addEventListener('input', update); function update(){}</script></body></html>"
             }
         ]
     }"""
@@ -80,3 +80,26 @@ def test_parse_and_validate_chunks_with_visual():
     assert chunks[0]["visual_html"] is None
     assert chunks[1]["has_visual"] is True
     assert "Content-Security-Policy" in chunks[1]["visual_html"]
+
+
+def test_quality_check_passes_valid_visual():
+    from src.api.learn import validate_visual_quality_check, _MOCK_PHYSICS_VISUAL
+    assert validate_visual_quality_check(_MOCK_PHYSICS_VISUAL) is True
+
+
+def test_quality_check_rejects_missing_range_slider():
+    from src.api.learn import validate_visual_quality_check
+    no_slider_html = "<html><body><button>Click</button><svg><circle cx='1' cy='1'/></svg><script>function update(){}</script></body></html>"
+    assert validate_visual_quality_check(no_slider_html) is False
+
+
+def test_quality_check_rejects_missing_svg():
+    from src.api.learn import validate_visual_quality_check
+    no_svg_html = "<html><body><input type='range'/><script>function update(){}</script></body></html>"
+    assert validate_visual_quality_check(no_svg_html) is False
+
+
+def test_quality_check_rejects_missing_js_update():
+    from src.api.learn import validate_visual_quality_check
+    no_js_html = "<html><body><input type='range'/><svg><circle cx='1' cy='1'/></svg></body></html>"
+    assert validate_visual_quality_check(no_js_html) is False
