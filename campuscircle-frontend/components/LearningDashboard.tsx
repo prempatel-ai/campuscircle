@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -11,6 +12,7 @@ interface SubjectMasteryItem {
 }
 
 interface RecentActivityItem {
+  session_id?: string;
   topic_title: string;
   subject_category: string;
   quiz_score: number;
@@ -301,6 +303,18 @@ export function LearningDashboard({ data, mentor, onChangeGoal }: LearningDashbo
               const dayLabel = relativeDay(item.completed_at);
               const prevDay = i > 0 ? relativeDay(data.recent_activity[i - 1].completed_at) : null;
               const showDay = dayLabel !== prevDay;
+              const innerRow = (
+                <div className="flex items-center justify-between gap-2 py-1.5 border-b border-border-muted/40 last:border-0 hover:bg-surface-muted/50 rounded-lg px-2 transition-colors cursor-pointer group">
+                  <p className="font-sans text-xs text-ink/80 group-hover:text-primary transition-colors truncate">{item.topic_title}</p>
+                  <span
+                    className={`font-mono text-[10px] font-bold shrink-0 ${
+                      item.quiz_score >= 80 ? "text-emerald-600" : item.quiz_score >= 60 ? "text-amber-600" : "text-red-500"
+                    }`}
+                  >
+                    {item.quiz_score > 0 ? `${item.quiz_score}%` : item.mastery_level}
+                  </span>
+                </div>
+              );
               return (
                 <div key={i}>
                   {showDay && (
@@ -308,16 +322,11 @@ export function LearningDashboard({ data, mentor, onChangeGoal }: LearningDashbo
                       {dayLabel}
                     </p>
                   )}
-                  <div className="flex items-center justify-between gap-2 py-1.5 border-b border-border-muted/40 last:border-0">
-                    <p className="font-sans text-xs text-ink/80 truncate">{item.topic_title}</p>
-                    <span
-                      className={`font-mono text-[10px] font-bold shrink-0 ${
-                        item.quiz_score >= 80 ? "text-emerald-600" : item.quiz_score >= 60 ? "text-amber-600" : "text-red-500"
-                      }`}
-                    >
-                      {item.quiz_score > 0 ? `${item.quiz_score}%` : item.mastery_level}
-                    </span>
-                  </div>
+                  {item.session_id ? (
+                    <Link href={`/learn/${item.session_id}`}>{innerRow}</Link>
+                  ) : (
+                    innerRow
+                  )}
                 </div>
               );
             })}

@@ -197,6 +197,7 @@ class SubjectMasteryItem(BaseModel):
 
 
 class RecentActivityItem(BaseModel):
+    session_id: Optional[str] = None
     topic_title: str
     subject_category: str
     quiz_score: float

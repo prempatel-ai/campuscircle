@@ -1050,6 +1050,53 @@ async def explain_youtube_transcript(
     )
 
 
+@router.get(
+    "/sessions/{session_id}",
+    response_model=ExplainResponse,
+    status_code=200,
+    summary="Get full state for an existing learning session by ID"
+)
+async def get_learning_session_by_id(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        session_uuid = uuid.UUID(session_id)
+        user_uuid = uuid.UUID(current_user["user_id"])
+    except ValueError:
+        raise HTTPException(404, "Learning session not found.")
+
+    res = await db.execute(
+        select(LearningSession).where(
+            LearningSession.id == session_uuid,
+            LearningSession.user_id == user_uuid
+        )
+    )
+    session = res.scalar_one_or_none()
+    if not session:
+        raise HTTPException(404, "Learning session not found.")
+
+    raw_chunks = session.explanation_chunks.get("chunks", []) if session.explanation_chunks else []
+    return ExplainResponse(
+        session_id=str(session.id),
+        video_id=session.video_id,
+        video_title=session.video_title,
+        language=session.language,
+        chunks=[
+            ExplanationChunk(
+                title=c["title"],
+                explanation=c["explanation"],
+                has_visual=bool(c.get("has_visual", False)),
+                visual_html=c.get("visual_html"),
+            )
+            for c in raw_chunks
+        ],
+        is_cached=True,
+        daily_explanations_remaining=999999,
+    )
+
+
 def sanitize_phase_questions(phase_dict: dict) -> List[QuizQuestionOut]:
     return [
         QuizQuestionOut(

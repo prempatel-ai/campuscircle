@@ -119,18 +119,36 @@ async def get_learning_dashboard(
     else:
         overall_mastery = 0.0
 
-    # 4. Recent activity — last 7 memories
+    # 4. Recent activity — last 7 memories or sessions
+    session_map_by_title = {s.video_title.strip().lower(): str(s.id) for s in sessions}
     recent_raw = memories[:7]
-    recent_activity: List[RecentActivityItem] = [
-        RecentActivityItem(
-            topic_title=m.topic_title,
-            subject_category=m.subject_category or "General",
-            quiz_score=m.quiz_score,
-            mastery_level=m.mastery_level or "Novice",
-            completed_at=m.completed_at,
+    recent_activity: List[RecentActivityItem] = []
+
+    for m in recent_raw:
+        s_id = str(m.session_id) if m.session_id else session_map_by_title.get(m.topic_title.strip().lower())
+        recent_activity.append(
+            RecentActivityItem(
+                session_id=s_id,
+                topic_title=m.topic_title,
+                subject_category=m.subject_category or "General",
+                quiz_score=m.quiz_score,
+                mastery_level=m.mastery_level or "Novice",
+                completed_at=m.completed_at,
+            )
         )
-        for m in recent_raw
-    ]
+
+    if not recent_activity and sessions:
+        for s in sessions[:7]:
+            recent_activity.append(
+                RecentActivityItem(
+                    session_id=str(s.id),
+                    topic_title=s.video_title,
+                    subject_category=infer_subject_category(s.video_title),
+                    quiz_score=0.0,
+                    mastery_level="In Progress",
+                    completed_at=s.created_at,
+                )
+            )
 
     # 5. Top concept gaps by miss_count
     gaps_stmt = (

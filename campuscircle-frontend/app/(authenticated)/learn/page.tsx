@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { ExplanationChunks } from "@/components/ExplanationChunks";
 import { LearnQuiz } from "@/components/LearnQuiz";
 import { LessonChat } from "@/components/LessonChat";
@@ -166,7 +167,7 @@ export default function LearnPage() {
   const [isSavingGoal, setIsSavingGoal] = useState<boolean>(false);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
-
+  const router = useRouter();
   const [viewState, setViewState] = useState<"input" | "loading" | "explanation" | "quiz">("input");
   const [loadingStep, setLoadingStep] = useState<string>("Processing topic content...");
 
@@ -260,10 +261,8 @@ export default function LearnPage() {
       });
 
       clearTimeout(progressTimer);
-      setExplainData(response);
-      setViewState("explanation");
-      // Refresh dashboard after new lesson is generated
-      setDashboardRefreshKey((k) => k + 1);
+      // Navigate directly to session URL /learn/[sessionId]
+      router.push(`/learn/${response.session_id}`);
     } catch (err) {
       setViewState("input");
       if (err instanceof ApiError) {
