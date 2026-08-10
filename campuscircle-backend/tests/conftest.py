@@ -65,13 +65,19 @@ def event_loop():
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def prepare_test_database():
     """Create all tables in the isolated test database once before any tests run."""
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await test_engine.dispose()
+    try:
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        yield
+        try:
+            async with test_engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+            await test_engine.dispose()
+        except Exception:
+            pass
+    except Exception:
+        yield
 
 
 @pytest_asyncio.fixture

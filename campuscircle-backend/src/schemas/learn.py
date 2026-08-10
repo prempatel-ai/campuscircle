@@ -28,6 +28,8 @@ class ExtractResponse(BaseModel):
 class ExplanationChunk(BaseModel):
     title: str
     explanation: str
+    has_visual: bool = Field(False, description="Whether this chunk includes an interactive sandboxed visual simulation")
+    visual_html: Optional[str] = Field(None, description="Self-contained HTML + SVG + JS for interactive visual simulation")
 
 
 class ExplainRequest(BaseModel):

@@ -7,7 +7,7 @@ import tempfile
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
@@ -295,16 +295,77 @@ async def get_transcript_with_fallback(video_id: str) -> List[dict]:
 
 # ─── Groq & Multilingual Helpers ───────────────────────────────────────────
 
+CSP_META_TAG = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\';">'
+
+
+def validate_and_sanitize_visual_html(html_str: str) -> Tuple[bool, Optional[str]]:
+    """
+    Scans and sanitizes AI-generated visual HTML code against strict security requirements.
+    - Rejects external script sources (<script src=...)
+    - Rejects dangerous network APIs (fetch, XMLHttpRequest, WebSocket, EventSource, sendBeacon)
+    - Rejects outer frame tags (<iframe, <object, <embed)
+    - Enforces embedded strict Content Security Policy meta tag.
+    Returns (is_valid, sanitized_html_or_none).
+    """
+    if not html_str or not isinstance(html_str, str):
+        return False, None
+
+    clean_str = html_str.strip()
+    if len(clean_str) < 20:
+        return False, None
+
+    lower_str = clean_str.lower()
+
+    # Check for <script src=...
+    if re.search(r'<script[^>]+src\s*=', lower_str):
+        return False, None
+
+    # Check for dangerous network APIs or outer embeds
+    for pattern in ["fetch(", "fetch (", "xmlhttprequest", "websocket", "eventsource", "sendbeacon", "<iframe", "<object", "<embed"]:
+        if pattern in lower_str:
+            return False, None
+
+    # Check for external script src or link href loading external HTTP resources
+    if re.search(r'<link[^>]+href\s*=\s*["\']http', lower_str):
+        return False, None
+
+    # Ensure CSP meta tag is present
+    if "content-security-policy" not in lower_str:
+        if "<head>" in lower_str:
+            clean_str = re.sub(r'(<head[^>]*>)', r'\1\n  ' + CSP_META_TAG, clean_str, count=1, flags=re.IGNORECASE)
+        elif "<html>" in lower_str:
+            clean_str = re.sub(r'(<html[^>]*>)', r'\1\n<head>\n  ' + CSP_META_TAG + '\n</head>', clean_str, count=1, flags=re.IGNORECASE)
+        else:
+            clean_str = f"<!DOCTYPE html>\n<html>\n<head>\n  {CSP_META_TAG}\n</head>\n<body>\n{clean_str}\n</body>\n</html>"
+
+    return True, clean_str
+
+
 def parse_and_validate_chunks(content_str: str) -> List[dict] | None:
     try:
         data = json.loads(content_str)
         chunks = data.get("chunks")
         if isinstance(chunks, list) and chunks:
-            validated = [
-                {"title": str(c["title"]).strip(), "explanation": str(c["explanation"]).strip()}
-                for c in chunks
-                if isinstance(c, dict) and "title" in c and "explanation" in c
-            ]
+            validated = []
+            for c in chunks:
+                if isinstance(c, dict) and "title" in c and "explanation" in c:
+                    has_vis = bool(c.get("has_visual", False))
+                    raw_html = c.get("visual_html")
+                    clean_html = None
+                    if has_vis and raw_html:
+                        is_valid, sanitized = validate_and_sanitize_visual_html(str(raw_html))
+                        if is_valid:
+                            clean_html = sanitized
+                        else:
+                            has_vis = False
+                            clean_html = None
+
+                    validated.append({
+                        "title": str(c["title"]).strip(),
+                        "explanation": str(c["explanation"]).strip(),
+                        "has_visual": has_vis,
+                        "visual_html": clean_html,
+                    })
             if validated:
                 return validated
     except Exception:
@@ -340,10 +401,96 @@ def validate_quiz_data_structure(data: dict) -> dict | None:
         return None
 
 
+_MOCK_PHYSICS_VISUAL = """<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline';">
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #FAF9F6; color: #1C2826; margin: 0; padding: 14px; box-sizing: border-box; }
+    .card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .controls { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+    .control-group { flex: 1; min-width: 130px; }
+    label { font-size: 12px; font-weight: 700; color: #2F5233; display: block; margin-bottom: 4px; }
+    input[type=range] { width: 100%; accent-color: #2F5233; }
+    .readout { display: flex; justify-content: space-between; background: #F1F5F9; border-radius: 8px; padding: 8px 12px; font-family: monospace; font-size: 12px; font-weight: 700; margin-top: 10px; color: #2F5233; }
+    svg { width: 100%; height: 110px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="controls">
+      <div class="control-group">
+        <label>Force (F): <span id="fVal">10</span> N</label>
+        <input type="range" id="fRange" min="1" max="50" value="10">
+      </div>
+      <div class="control-group">
+        <label>Mass (m): <span id="mVal">5</span> kg</label>
+        <input type="range" id="mRange" min="1" max="20" value="5">
+      </div>
+    </div>
+    <svg id="simSvg" viewBox="0 0 400 110">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#E11D48"/>
+        </marker>
+      </defs>
+      <line x1="20" y1="85" x2="380" y2="85" stroke="#94A3B8" stroke-width="2" />
+      <rect id="box" x="40" y="45" width="40" height="40" rx="6" fill="#2F5233" />
+      <text id="boxText" x="60" y="69" fill="#FFFFFF" font-size="11" font-weight="bold" text-anchor="middle">5kg</text>
+      <line id="forceArrow" x1="80" y1="65" x2="130" y2="65" stroke="#E11D48" stroke-width="3" marker-end="url(#arrow)" />
+    </svg>
+    <div class="readout">
+      <span>Formula: a = F / m</span>
+      <span>Acceleration (a): <span id="aVal">2.00</span> m/s²</span>
+    </div>
+  </div>
+  <script>
+    const fRange = document.getElementById('fRange');
+    const mRange = document.getElementById('mRange');
+    const fVal = document.getElementById('fVal');
+    const mVal = document.getElementById('mVal');
+    const aVal = document.getElementById('aVal');
+    const boxText = document.getElementById('boxText');
+    const forceArrow = document.getElementById('forceArrow');
+
+    function update() {
+      const F = parseFloat(fRange.value);
+      const m = parseFloat(mRange.value);
+      const a = (F / m).toFixed(2);
+      fVal.textContent = F;
+      mVal.textContent = m;
+      aVal.textContent = a;
+      boxText.textContent = m + 'kg';
+      const arrowLen = Math.min(120, 20 + F * 2.0);
+      forceArrow.setAttribute('x2', 80 + arrowLen);
+    }
+    fRange.addEventListener('input', update);
+    mRange.addEventListener('input', update);
+    update();
+  </script>
+</body>
+</html>"""
+
+
 _MOCK_CHUNKS = [
-    {"title": "Introduction & Fundamentals", "explanation": "Imagine opening a new textbook for the first time. The material lays out foundational principles in clear, simple terms."},
-    {"title": "Real-World Application & Logic", "explanation": "A practical scenario—think of a chef orchestrating a kitchen during rush hour—demonstrates how each concept works together."},
-    {"title": "Core Synthesis & Evaluation", "explanation": "By understanding these building blocks, you can apply them to solve complex problems independently."},
+    {
+        "title": "Introduction & Fundamentals",
+        "explanation": "Imagine opening a new textbook for the first time. The material lays out foundational principles in clear, simple terms.",
+        "has_visual": False,
+        "visual_html": None,
+    },
+    {
+        "title": "Interactive STEM Simulation & Mechanics",
+        "explanation": "Newton's Second Law states that force equals mass times acceleration (F = m * a). Adjust the force and mass sliders below to see how acceleration updates live in real time.",
+        "has_visual": True,
+        "visual_html": _MOCK_PHYSICS_VISUAL,
+    },
+    {
+        "title": "Core Synthesis & Evaluation",
+        "explanation": "By understanding these building blocks, you can apply them to solve complex problems independently.",
+        "has_visual": False,
+        "visual_html": None,
+    },
 ]
 
 
@@ -375,9 +522,13 @@ async def call_groq_api_for_explanation(
     system_prompt = (
         "You are an expert AI educator. Break down the provided video transcript into "
         "digestible, storytelling-style explanation chunks for a first-time learner. "
-        f"You MUST write all titles and explanations directly in {language_name}.{goal_prompt}{memory_prompt} "
-        "Return a JSON object with a single top-level key 'chunks' — a list where each item "
-        "has exactly two string keys: 'title' and 'explanation'."
+        f"You MUST write all titles and explanations directly in {language_name}.{goal_prompt}{memory_prompt}\n\n"
+        "FOR EACH CHUNK, EVALUATE VISUAL SUITABILITY:\n"
+        "- Decide if an interactive visual simulation (HTML + inline SVG + vanilla JS with controls like sliders or buttons driving live readouts and animated SVG diagram attributes) WOULD MEANINGFULLY HELP teach this specific concept.\n"
+        "- ONLY generate a visual for STEM, physics, math, engineering, algorithms, or data structure concepts where an interactive visual genuinely aids understanding (e.g. force + mass sliders driving a live acceleration readout and animated SVG box, or interactive step visualizer).\n"
+        "- DO NOT force a visual on non-visualizable chunks (e.g. historical background, philosophical context, definitions, introductory summaries). For non-visual chunks, set 'has_visual': false and 'visual_html': null.\n"
+        "- FOR QUALIFYING CHUNKS: set 'has_visual': true and provide a self-contained string in 'visual_html' containing complete HTML, inline CSS, inline SVG, and plain vanilla JS script. NO external scripts (<script src=...), NO network calls (fetch/XHR), NO external links, NO markdown formatting inside the string. The visual MUST include labeled input controls (sliders or buttons), an SVG diagram, a live readout, and plain JS updating SVG attributes dynamically.\n\n"
+        "Return a JSON object with a single top-level key 'chunks' — a list where each item has exact keys: 'title', 'explanation', 'has_visual' (boolean), and 'visual_html' (string or null)."
     )
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
@@ -659,7 +810,15 @@ async def explain_youtube_transcript(
             video_id=video_id,
             video_title=cached_session.video_title,
             language=cached_session.language,
-            chunks=[ExplanationChunk(title=c["title"], explanation=c["explanation"]) for c in raw_chunks],
+            chunks=[
+                ExplanationChunk(
+                    title=c["title"],
+                    explanation=c["explanation"],
+                    has_visual=bool(c.get("has_visual", False)),
+                    visual_html=c.get("visual_html"),
+                )
+                for c in raw_chunks
+            ],
             is_cached=True,
             daily_explanations_remaining=max(0, EXPLAIN_DAILY_LIMIT - daily_count),
         )
@@ -722,7 +881,15 @@ async def explain_youtube_transcript(
         video_id=video_id,
         video_title=video_title,
         language=session.language,
-        chunks=[ExplanationChunk(title=c["title"], explanation=c["explanation"]) for c in chunks_data],
+        chunks=[
+            ExplanationChunk(
+                title=c["title"],
+                explanation=c["explanation"],
+                has_visual=bool(c.get("has_visual", False)),
+                visual_html=c.get("visual_html"),
+            )
+            for c in chunks_data
+        ],
         is_cached=False,
         daily_explanations_remaining=max(0, EXPLAIN_DAILY_LIMIT - daily_count - 1),
     )

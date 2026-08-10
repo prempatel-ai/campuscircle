@@ -1,10 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
+import { InteractiveVisual } from "./InteractiveVisual";
 
 interface Chunk {
   title: string;
   explanation: string;
+  has_visual?: boolean;
+  visual_html?: string | null;
 }
 
 interface ExplanationChunksProps {
@@ -64,13 +67,16 @@ export function ExplanationChunks({
           <button
             key={idx}
             onClick={() => setActiveIndex(idx)}
-            className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+            className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activeIndex === idx
                 ? "bg-primary text-surface shadow-xs"
                 : "bg-surface border border-border-muted text-ink/70 hover:text-ink"
             }`}
           >
-            Part {idx + 1}
+            <span>Part {idx + 1}</span>
+            {chunk.has_visual && chunk.visual_html && (
+              <span className={`w-1.5 h-1.5 rounded-full ${activeIndex === idx ? "bg-surface" : "bg-primary"}`} />
+            )}
           </button>
         ))}
       </div>
@@ -94,6 +100,13 @@ export function ExplanationChunks({
           <p className="font-sans text-sm sm:text-base text-ink/80 leading-relaxed whitespace-pre-line">
             {currentChunk.explanation}
           </p>
+
+          {/* Render Sandboxed Interactive Visual if present */}
+          {currentChunk.has_visual && currentChunk.visual_html && (
+            <div className="pt-2">
+              <InteractiveVisual visualHtml={currentChunk.visual_html} title={currentChunk.title} />
+            </div>
+          )}
         </div>
 
         {/* Next / Previous Controls */}
