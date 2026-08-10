@@ -15,14 +15,12 @@ export function InteractiveVisual({ visualHtml, title }: InteractiveVisualProps)
   const injectedScript = `
     <script>
       (function() {
-        var lastSentHeight = 0;
         function sendHeight() {
           try {
             var target = document.querySelector('.card') || document.body.firstElementChild || document.body;
             var rect = target.getBoundingClientRect();
-            var h = Math.ceil(rect.height) + 12;
-            if (h > 50 && Math.abs(h - lastSentHeight) > 8) {
-              lastSentHeight = h;
+            var h = Math.ceil(rect.height) + 24;
+            if (h > 50) {
               window.parent.postMessage({ type: 'VISUAL_HEIGHT', instanceId: '${instanceId}', height: h }, '*');
             }
           } catch(e) {}
@@ -31,6 +29,13 @@ export function InteractiveVisual({ visualHtml, title }: InteractiveVisualProps)
         document.addEventListener('DOMContentLoaded', sendHeight);
         document.addEventListener('input', sendHeight);
         document.addEventListener('click', sendHeight);
+        if (typeof ResizeObserver !== 'undefined' && document.body) {
+          try {
+            new ResizeObserver(sendHeight).observe(document.body);
+            var cardEl = document.querySelector('.card');
+            if (cardEl) new ResizeObserver(sendHeight).observe(cardEl);
+          } catch(e) {}
+        }
         setTimeout(sendHeight, 150);
         setTimeout(sendHeight, 500);
       })();
@@ -55,10 +60,10 @@ export function InteractiveVisual({ visualHtml, title }: InteractiveVisualProps)
         typeof event.data.height === "number" &&
         event.data.height > 0
       ) {
-        // Clamp height safely between 240px and 520px max to prevent any infinite expansion loops
-        const clamped = Math.min(Math.max(event.data.height, 240), 520);
+        // Clamp height safely between 260px and 680px max to prevent any infinite expansion loops while allowing tall readouts
+        const clamped = Math.min(Math.max(event.data.height, 260), 680);
         setIframeHeight((prev) => {
-          if (Math.abs(prev - clamped) > 10) {
+          if (Math.abs(prev - clamped) > 6) {
             return clamped;
           }
           return prev;

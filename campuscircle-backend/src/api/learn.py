@@ -352,6 +352,7 @@ def validate_visual_quality_check(html_str: str) -> bool:
     1. Contains at least one <input type="range"> (continuous control, not just buttons)
     2. Contains an <svg> element
     3. Contains JS code handling live updates (oninput, addEventListener, requestAnimationFrame, or update())
+    4. Contains CampusCircle CSS variable design tokens (--primary, --surface, --ink)
     """
     if not html_str or not isinstance(html_str, str):
         logger.warning("[VISUAL QUALITY CHECK FAILED] HTML string is empty or invalid type.")
@@ -384,7 +385,13 @@ def validate_visual_quality_check(html_str: str) -> bool:
         logger.warning("[VISUAL QUALITY CHECK FAILED] Missing JS event listener or update function.")
         return False
 
-    logger.info("[VISUAL QUALITY CHECK PASSED] Valid visual HTML with continuous range slider <input type='range'>, <svg>, and JS update logic.")
+    # 4. Must contain CampusCircle CSS design variable tokens
+    has_tokens = all(tok in lower_str for tok in ["--primary", "--surface", "--ink"])
+    if not has_tokens:
+        logger.warning("[VISUAL QUALITY CHECK FAILED] Missing CampusCircle CSS variable design tokens (--primary, --surface, --ink).")
+        return False
+
+    logger.info("[VISUAL QUALITY CHECK PASSED] Valid visual HTML with continuous range slider <input type='range'>, <svg>, JS update logic, and CSS design tokens.")
     return True
 
 
@@ -634,6 +641,7 @@ async def call_groq_api_for_explanation(
         "- MANDATORY RULE: This output MUST contain at least one <input type=\"range\"> element for every adjustable variable in the concept. Static buttons are NOT an acceptable substitute for sliders. Output containing only buttons with no range input will be rejected.\n"
         "- MUST USE CAMPUSCIRCLE DESIGN TOKENS IN INLINE CSS:\n"
         "  :root { --background: #FAF9F6; --surface: #FFFFFF; --primary: #2F5233; --accent: #E8A33D; --ink: #1C2826; --border: #E2E8F0; }\n"
+        "- MANDATORY TEXT SPACING & FORMATTING: Always place titles, formula labels, and readout values inside visually separate elements (e.g. separate <div> or <span> blocks with proper CSS margins). NEVER concatenate inline text without spaces (e.g. PROHIBITED: 'DemoFormula', 'FormulaReadout').\n"
         "- MUST MATCH THIS EXACT STRUCTURAL PATTERN:\n"
         "  1. Continuous range sliders (<input type='range'>) for every adjustable physical/mathematical variable.\n"
         "  2. An SVG diagram (<svg>) with dynamic attributes or vectors (e.g. moving box, changing arrows/colors).\n"

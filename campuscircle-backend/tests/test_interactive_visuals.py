@@ -69,7 +69,7 @@ def test_parse_and_validate_chunks_with_visual():
                 "title": "Interactive STEM Chunk",
                 "explanation": "Newton's force simulation",
                 "has_visual": true,
-                "visual_html": "<html><body><input type='range' id='f'/><svg><rect width='10' height='10'/></svg><script>const f=document.getElementById('f'); f.addEventListener('input', update); function update(){}</script></body></html>"
+                "visual_html": "<html><head><style>:root { --primary: #2F5233; --surface: #FFFFFF; --ink: #1C2826; }</style></head><body><input type='range' id='f'/><svg><rect width='10' height='10'/></svg><script>const f=document.getElementById('f'); f.addEventListener('input', update); function update(){}</script></body></html>"
             }
         ]
     }"""
@@ -89,17 +89,23 @@ def test_quality_check_passes_valid_visual():
 
 def test_quality_check_rejects_missing_range_slider():
     from src.api.learn import validate_visual_quality_check
-    no_slider_html = "<html><body><button>Click</button><svg><circle cx='1' cy='1'/></svg><script>function update(){}</script></body></html>"
+    no_slider_html = "<html><head><style>:root { --primary: #2F5233; --surface: #FFFFFF; --ink: #1C2826; }</style></head><body><button>Click</button><svg><circle cx='1' cy='1'/></svg><script>function update(){}</script></body></html>"
     assert validate_visual_quality_check(no_slider_html) is False
 
 
 def test_quality_check_rejects_missing_svg():
     from src.api.learn import validate_visual_quality_check
-    no_svg_html = "<html><body><input type='range'/><script>function update(){}</script></body></html>"
+    no_svg_html = "<html><head><style>:root { --primary: #2F5233; --surface: #FFFFFF; --ink: #1C2826; }</style></head><body><input type='range'/><script>function update(){}</script></body></html>"
     assert validate_visual_quality_check(no_svg_html) is False
 
 
 def test_quality_check_rejects_missing_js_update():
     from src.api.learn import validate_visual_quality_check
-    no_js_html = "<html><body><input type='range'/><svg><circle cx='1' cy='1'/></svg></body></html>"
+    no_js_html = "<html><head><style>:root { --primary: #2F5233; --surface: #FFFFFF; --ink: #1C2826; }</style></head><body><input type='range'/><svg><circle cx='1' cy='1'/></svg></body></html>"
     assert validate_visual_quality_check(no_js_html) is False
+
+
+def test_quality_check_rejects_missing_css_tokens():
+    from src.api.learn import validate_visual_quality_check
+    no_tokens_html = "<html><body><input type='range' id='f'/><svg><rect width='10' height='10'/></svg><script>const f=document.getElementById('f'); f.addEventListener('input', update); function update(){}</script></body></html>"
+    assert validate_visual_quality_check(no_tokens_html) is False
