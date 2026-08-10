@@ -341,6 +341,11 @@ def validate_and_sanitize_visual_html(html_str: str) -> Tuple[bool, Optional[str
     return True, clean_str
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def validate_visual_quality_check(html_str: str) -> bool:
     """
     Programmatically verifies that generated visual HTML meets quality criteria:
@@ -349,6 +354,7 @@ def validate_visual_quality_check(html_str: str) -> bool:
     3. Contains JS code handling live updates (oninput, addEventListener, requestAnimationFrame, or update())
     """
     if not html_str or not isinstance(html_str, str):
+        logger.warning("[VISUAL QUALITY CHECK FAILED] HTML string is empty or invalid type.")
         return False
 
     lower_str = html_str.lower()
@@ -356,11 +362,13 @@ def validate_visual_quality_check(html_str: str) -> bool:
     # 1. Must contain continuous range slider
     has_slider = bool(re.search(r'<input[^>]+type\s*=\s*["\']range["\']', lower_str))
     if not has_slider:
+        logger.warning("[VISUAL QUALITY CHECK FAILED] Missing continuous range slider <input type='range'>. Static buttons are not acceptable.")
         return False
 
     # 2. Must contain SVG diagram
     has_svg = "<svg" in lower_str
     if not has_svg:
+        logger.warning("[VISUAL QUALITY CHECK FAILED] Missing <svg> diagram element.")
         return False
 
     # 3. Must contain JS update logic
@@ -373,8 +381,10 @@ def validate_visual_quality_check(html_str: str) -> bool:
         "let update"
     ])
     if not has_js_update:
+        logger.warning("[VISUAL QUALITY CHECK FAILED] Missing JS event listener or update function.")
         return False
 
+    logger.info("[VISUAL QUALITY CHECK PASSED] Valid visual HTML with continuous range slider <input type='range'>, <svg>, and JS update logic.")
     return True
 
 
@@ -621,6 +631,7 @@ async def call_groq_api_for_explanation(
         "- DO NOT force a visual on non-visualizable chunks (e.g. historical background, philosophical context, definitions, introductory summaries). For non-visual chunks, set 'has_visual': false and 'visual_html': null.\n\n"
         "FOR QUALIFYING CHUNKS (has_visual: true):\n"
         "- Generate a complete self-contained HTML string in 'visual_html'.\n"
+        "- MANDATORY RULE: This output MUST contain at least one <input type=\"range\"> element for every adjustable variable in the concept. Static buttons are NOT an acceptable substitute for sliders. Output containing only buttons with no range input will be rejected.\n"
         "- MUST USE CAMPUSCIRCLE DESIGN TOKENS IN INLINE CSS:\n"
         "  :root { --background: #FAF9F6; --surface: #FFFFFF; --primary: #2F5233; --accent: #E8A33D; --ink: #1C2826; --border: #E2E8F0; }\n"
         "- MUST MATCH THIS EXACT STRUCTURAL PATTERN:\n"
@@ -629,8 +640,8 @@ async def call_groq_api_for_explanation(
         "  3. A live formula readout box displaying exact mathematical equations and correct physical units (e.g. 'a = F / m', 'Acceleration (a): 2.00 m/s²', 'Force: 10 N', 'Mass: 5 kg'). NEVER label force/newtons as acceleration!\n"
         "  4. Optional push / action / reset buttons.\n"
         "  5. Plain vanilla JS update functions listening to 'input' events on range sliders.\n\n"
-        "REFERENCE STRUCTURAL TEMPLATE TO FOLLOW:\n"
-        f"{_MOCK_PHYSICS_VISUAL}\n\n"
+        "LITERAL WORKING REFERENCE HTML TEMPLATE TO STRUCTURALLY MATCH:\n"
+        f"```html\n{_MOCK_PHYSICS_VISUAL}\n```\n\n"
         "Return a JSON object with a single top-level key 'chunks' — a list where each item has exact keys: 'title', 'explanation', 'has_visual' (boolean), and 'visual_html' (string or null)."
     )
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -664,6 +675,13 @@ async def call_groq_api_for_explanation(
                             if idx < len(parsed) and not parsed[idx]["has_visual"]:
                                 needs_quality_retry = True
                                 break
+
+                    if needs_quality_retry:
+                        logger.warning(f"[VISUAL QUALITY RETRY] Attempt {attempt + 1} produced visual chunks that failed quality check (<input type='range'> missing). Triggering retry pass...")
+                        if attempt == 1:
+                            logger.warning("[VISUAL QUALITY REJECTED] Attempt 2 failed quality check. Setting has_visual=False for non-conforming chunks per quality contract.")
+                    else:
+                        logger.info(f"[VISUAL GENERATION SUCCESS] Attempt {attempt + 1} passed all security and quality checks with valid sliders and SVG.")
 
                     if not needs_quality_retry or attempt == 1:
                         return parsed
