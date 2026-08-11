@@ -45,31 +45,7 @@ from src.workers.email import send_verification_email, send_password_reset_email
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-class InMemoryRateLimiter:
-    def __init__(self, limit: int = 5, window_seconds: int = 3600):
-        self.limit = limit
-        self.window_seconds = window_seconds
-        self.history = defaultdict(list)
-
-    def is_rate_limited(self, key: str) -> bool:
-        now = time.time()
-        self.history[key] = [
-            ts for ts in self.history[key]
-            if now - ts < self.window_seconds
-        ]
-        return len(self.history[key]) >= self.limit
-
-    def record(self, key: str):
-        self.history[key].append(time.time())
-
-
-def get_client_ip(request: Request) -> str:
-    x_forwarded_for = request.headers.get("X-Forwarded-For")
-    if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-    if request.client and request.client.host:
-        return request.client.host
-    return "127.0.0.1"
+from src.utils.rate_limit import InMemoryRateLimiter, get_client_ip
 
 
 # Rate Limiters:
@@ -125,10 +101,8 @@ async def signup(
             db.add(university)
             await db.flush()
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="The email domain is not associated with any supported university."
-            )
+            # For non-academic domains, we simply leave university as None
+            university = None
         
     # 2. Check if email already exists
     email_check_stmt = select(User).where(User.email == payload.email)
@@ -149,17 +123,15 @@ async def signup(
         )
         
     # 4. Hash the password and create the User
-    hashed_password = hash_password(payload.password)
-    
     new_user = User(
-        id=uuid.uuid4(),
-        university_id=university.id,
         email=payload.email,
         username=payload.username,
-        password_hash=hashed_password,
-        email_verified=True
+        password_hash=hash_password(payload.password),
+        university_id=university.id if university else None,
+        role="student",
+        notifications_enabled=True,
+        email_verified=True,  # Auto-verify for easier local testing
     )
-    
     db.add(new_user)
     await db.flush()  # Populates new_user.id
     

@@ -46,7 +46,35 @@ const SORT_OPTIONS: SortType[] = ["for-you", "new", "hot", "top"];
 const PAGE_SIZE = 10;
 
 function FeedContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  
+  if (user && !user.university_id) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh] p-6 text-center">
+        <div className="max-w-md space-y-6">
+          <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold font-display text-ink">University Access Required</h2>
+          <p className="text-ink/75 font-sans">
+            The community feed is a verified space for university students. 
+            To join the conversation and view posts, you need to sign up using your university email address.
+          </p>
+          <div className="pt-4 flex flex-col gap-3 items-center">
+            <button
+              type="button"
+              className="px-6 py-2.5 bg-primary text-white font-semibold font-sans rounded-full hover:bg-primary/90 transition-all shadow-sm"
+              onClick={() => window.location.href = "/learn"}
+            >
+              Go to Learning Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const router = useRouter();
   const searchParams = useSearchParams();
 

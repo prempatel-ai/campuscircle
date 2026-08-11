@@ -23,6 +23,7 @@ from youtube_transcript_api import (
 
 from src.config import settings, get_groq_api_key
 from src.database import get_db
+from src.utils.rate_limit import InMemoryRateLimiter, get_client_ip
 from src.auth.dependencies import get_current_user
 from src.models.learn import LearnExtractionLog
 from src.models.learning_session import LearningSession
@@ -79,9 +80,10 @@ from src.services.weekly_report_service import (
 )
 
 router = APIRouter(prefix="/learn", tags=["learn"])
+ai_endpoint_limiter = InMemoryRateLimiter(limit=100, window_seconds=86400) # 100 requests per day per user
 
 YOUTUBE_REGEX = re.compile(
-    r'(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})'
+    r'(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})'
 )
 
 EXTRACTION_DAILY_LIMIT = 999999  # Disabled for testing
@@ -198,6 +200,7 @@ async def fetch_transcript_supadata(video_id: str) -> List[dict]:
     async with httpx.AsyncClient(timeout=15.0) as client:
         res = await client.get(url, headers=headers)
         if res.status_code != 200:
+            print(f"Supadata API returned {res.status_code}: {res.text}")
             raise Exception(f"Supadata API returned {res.status_code}")
 
         data = res.json()
@@ -265,14 +268,16 @@ async def fetch_transcript_ytdlp(video_id: str) -> List[dict]:
 
 async def get_transcript_with_fallback(video_id: str) -> List[dict]:
     try:
+        print(f"Attempting Supadata for {video_id}...")
         return await fetch_transcript_supadata(video_id)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Supadata failed: {e}")
 
     try:
+        print(f"Attempting yt-dlp for {video_id}...")
         return await fetch_transcript_ytdlp(video_id)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"yt-dlp failed: {e}")
 
     try:
         try:
@@ -766,6 +771,9 @@ async def call_groq_api_for_explanation(
             except Exception as e:
                 logger.warning(f"[GROQ API TIMEOUT/ERROR] Attempt {attempt + 1} failed: {e}")
                 await asyncio.sleep(1.0)
+
+    raise HTTPException(status_code=502, detail="Failed to generate explanation from AI provider (API Limits Reached). Please try again.")
+
 def get_mock_quiz(language_name: str = "English") -> dict:
     lang_lower = str(language_name).lower()
     if "gujarati" in lang_lower or "ગુજરાતી" in lang_lower:

@@ -22,13 +22,13 @@ async def generate_presession_mentor_guidance(
     """
     profile = await get_or_create_learning_profile(db, user_id)
 
-    # 1. Onboarding for brand new students
     if profile.total_sessions == 0:
         goal_text = f" aiming for {profile.career_goal}" if profile.career_goal else ""
+        suggested_topic = f"Intro to {profile.career_goal}" if profile.career_goal else "Intro to General STEM"
         return PreSessionMentorOut(
             greeting="Welcome to CampusCircle Learn!",
             mentor_message=f"I'm Reva, your personal AI learning mentor{goal_text}. Paste a YouTube link or study notes below, and I'll break it down into interactive story chapters and adaptive quiz challenges!",
-            suggested_next_topic="Python in 100 Seconds",
+            suggested_next_topic=suggested_topic,
             career_goal=profile.career_goal,
             streak_days=0
         )
@@ -46,7 +46,7 @@ async def generate_presession_mentor_guidance(
     weak_concepts = list(gaps_res.scalars().all())
 
     # Fallback default if LLM fails or API key not set
-    fallback_topic = weak_concepts[0] if weak_concepts else "Data Structures & Algorithms"
+    fallback_topic = weak_concepts[0] if weak_concepts else (profile.career_goal if profile.career_goal else "Calculus & Linear Algebra")
     fallback = PreSessionMentorOut(
         greeting=f"Welcome back! {profile.current_streak_days}-Day Streak",
         mentor_message=f"You've completed {profile.total_sessions} learning sessions! "

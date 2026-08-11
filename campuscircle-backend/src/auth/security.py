@@ -54,12 +54,13 @@ def create_access_token(user_id: Any, university_id: Any, role: str, username: s
     to_encode = {
         "sub": str(user_id),
         "user_id": str(user_id),
-        "university_id": str(university_id),
         "username": username,
         "role": role,
         "type": "access",
         "exp": expire,
     }
+    if university_id is not None:
+        to_encode["university_id"] = str(university_id)
     
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 

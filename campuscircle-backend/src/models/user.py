@@ -22,7 +22,7 @@ class User(Base):
     # ForeignKey("universities.id") is the link — this row cannot exist
     # without a matching row in the universities table.
     university_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("universities.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True), ForeignKey("universities.id"), nullable=True, index=True
     )
 
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)

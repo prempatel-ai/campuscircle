@@ -6,6 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
+from src.api.learn import ai_endpoint_limiter
 from src.auth.dependencies import get_current_user
 from src.services.reva_service import generate_reva_chat_response
 from src.models.conversation import Conversation
@@ -64,6 +65,11 @@ async def chat_with_reva(
 ):
     if not payload.message.strip():
         raise HTTPException(400, "Message cannot be empty.")
+    
+    user_uuid_str = str(current_user.get("user_id", current_user.get("id")))
+    if ai_endpoint_limiter.is_rate_limited(user_uuid_str):
+        raise HTTPException(status_code=429, detail="Too many AI requests today. Please try again tomorrow.")
+    ai_endpoint_limiter.record(user_uuid_str)
 
     history_dicts = [{"sender": item.sender, "text": item.text} for item in payload.history or []]
 
@@ -175,6 +181,9 @@ async def send_message(
     db: AsyncSession = Depends(get_db)
 ):
     user_uuid = uuid.UUID(current_user["user_id"])
+    if ai_endpoint_limiter.is_rate_limited(str(user_uuid)):
+        raise HTTPException(status_code=429, detail="Too many AI requests today. Please try again tomorrow.")
+    ai_endpoint_limiter.record(str(user_uuid))
     conv_uuid = uuid.UUID(conversation_id)
 
     conv_res = await db.execute(select(Conversation).where(Conversation.id == conv_uuid))

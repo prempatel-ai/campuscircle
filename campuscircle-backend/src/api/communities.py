@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from src.database import get_db
-from src.auth.dependencies import get_current_user
+from src.auth.dependencies import require_university_student
 from src.models.user import User
 from src.schemas.community import CommunityCreate, CommunityOut, PaginatedCommunities
 from src.repositories.community_repository import (
@@ -19,26 +19,7 @@ from src.repositories.community_repository import (
 router = APIRouter(prefix="/communities", tags=["communities"])
 
 
-# Simple in-memory rate limiter for community creation: max 5 per hour per user
-class InMemoryRateLimiter:
-    def __init__(self, limit: int = 5, window_seconds: int = 3600):
-        self.limit = limit
-        self.window_seconds = window_seconds
-        # Maps user_uuid_str -> list of creation timestamps
-        self.history = defaultdict(list)
-
-    def is_rate_limited(self, user_id: str) -> bool:
-        now = time.time()
-        # Keep only timestamps within the active window
-        self.history[user_id] = [
-            ts for ts in self.history[user_id]
-            if now - ts < self.window_seconds
-        ]
-        return len(self.history[user_id]) >= self.limit
-
-    def record_creation(self, user_id: str):
-        self.history[user_id].append(time.time())
-
+from src.utils.rate_limit import InMemoryRateLimiter
 
 community_creation_limiter = InMemoryRateLimiter(limit=5, window_seconds=3600)
 
@@ -51,7 +32,7 @@ community_creation_limiter = InMemoryRateLimiter(limit=5, window_seconds=3600)
 )
 async def create_new_community(
     payload: CommunityCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     user_id_str = current_user["user_id"]
@@ -104,7 +85,7 @@ async def create_new_community(
         )
         
     # 4. Record successful creation in rate limiter
-    community_creation_limiter.record_creation(user_id_str)
+    community_creation_limiter.record(user_id_str)
     
     return community
 
@@ -118,7 +99,7 @@ async def create_new_community(
 async def list_communities(
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(20, ge=1, le=100, description="Page size"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     # Fetch communities ONLY for user's university

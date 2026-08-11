@@ -6,7 +6,7 @@ import { apiRequest } from "../lib/api";
 interface DecodedToken {
   sub: string;
   user_id: string;
-  university_id: string;
+  university_id: string | null;
   username?: string;
   role: string;
   exp: number;
@@ -14,7 +14,7 @@ interface DecodedToken {
 
 interface AuthUser {
   user_id: string;
-  university_id: string;
+  university_id: string | null;
   username: string;
   role: string;
 }
@@ -30,7 +30,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function decodeJwt(token: string): DecodedToken | null {
+export function decodeJwt(token: string): DecodedToken | null {
   try {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -61,7 +61,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setAccessToken(storedToken);
         setUser({
           user_id: decoded.user_id,
-          university_id: decoded.university_id,
+          university_id: decoded.university_id === "None" ? null : (decoded.university_id || null),
           username: decoded.username || decoded.sub || "user",
           role: decoded.role,
         });
@@ -83,7 +83,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAccessToken(newAccessToken);
       setUser({
         user_id: decoded.user_id,
-        university_id: decoded.university_id,
+        university_id: decoded.university_id === "None" ? null : (decoded.university_id || null),
         username: decoded.username || decoded.sub || "user",
         role: decoded.role,
       });

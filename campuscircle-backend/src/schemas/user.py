@@ -24,7 +24,7 @@ class DeleteAccountRequest(BaseModel):
 
 class UserProfileOut(BaseModel):
     id: uuid.UUID
-    university_id: uuid.UUID
+    university_id: Optional[uuid.UUID] = None
     email: str
     username: str
     role: str
