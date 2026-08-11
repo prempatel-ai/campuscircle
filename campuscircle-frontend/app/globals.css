@@ -122,6 +122,15 @@ body {
   outline-offset: 2px !important;
 }
 
+.no-focus-outline,
+.no-focus-outline:focus,
+.no-focus-outline:focus-visible {
+  outline: none !important;
+  outline-offset: 0px !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
 /* Accessibility: Disable all motion if OS prefers-reduced-motion is active */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {

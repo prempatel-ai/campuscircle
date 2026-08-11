@@ -469,8 +469,7 @@ export default function AskRevaPage() {
                 }
               }}
               placeholder="Ask Reva anything..."
-              className="flex-1 bg-transparent text-xs sm:text-sm text-ink placeholder:text-ink/40 outline-none border-none resize-none font-sans py-1 max-h-24 focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 shadow-none ring-0"
-              style={{ outline: "none", boxShadow: "none", border: "none" }}
+              className="flex-1 bg-transparent text-xs sm:text-sm text-ink placeholder:text-ink/40 resize-none font-sans py-1 max-h-24 no-focus-outline"
             />
 
             <div className="flex items-center gap-2 shrink-0">
