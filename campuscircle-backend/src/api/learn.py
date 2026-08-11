@@ -610,7 +610,26 @@ async def call_groq_api_for_explanation(
     previous_memories: Optional[List[str]] = None
 ) -> List[dict]:
     if not settings.groq_api_key:
-        return _MOCK_CHUNKS
+        return [
+            {
+                "title": f"Core Concept & Overview ({language_name})",
+                "explanation": f"Here is a mock explanation breakdown for the transcript in {language_name}. Key ideas are presented step-by-step for easy mastery.",
+                "has_visual": True,
+                "visual_html": _MOCK_PHYSICS_VISUAL,
+            },
+            {
+                "title": f"Practical Application ({language_name})",
+                "explanation": f"This section demonstrates how to apply the fundamental principles to solve real-world problems in {language_name}.",
+                "has_visual": False,
+                "visual_html": None,
+            },
+            {
+                "title": f"Summary & Takeaways ({language_name})",
+                "explanation": f"To summarize: review the key formulas, test your understanding in the quiz, and practice applying these concepts.",
+                "has_visual": False,
+                "visual_html": None,
+            },
+        ]
 
     goal_prompt = (
         f" The student's primary career goal is '{career_goal}'. Where relevant and natural, "
@@ -662,48 +681,57 @@ async def call_groq_api_for_explanation(
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.5,
+        "max_tokens": 4096,
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        for attempt in range(2):
-            res = await client.post(url, headers=headers, json=payload)
-            if res.status_code == 200:
-                content_text = res.json()["choices"][0]["message"]["content"]
-                parsed = parse_and_validate_chunks(content_text)
-                if parsed:
-                    # Check if any chunk intended to have a visual was rejected by quality/security check
-                    try:
-                        raw_json_chunks = json.loads(content_text).get("chunks", [])
-                    except Exception:
-                        raw_json_chunks = []
+    last_valid_parsed = None
 
-                    needs_quality_retry = False
-                    for idx, r_chunk in enumerate(raw_json_chunks):
-                        if isinstance(r_chunk, dict) and r_chunk.get("has_visual"):
-                            if idx < len(parsed) and not parsed[idx]["has_visual"]:
-                                needs_quality_retry = True
-                                break
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        for attempt in range(3):
+            try:
+                res = await client.post(url, headers=headers, json=payload)
+                if res.status_code == 200:
+                    content_text = res.json()["choices"][0]["message"]["content"]
+                    parsed = parse_and_validate_chunks(content_text)
+                    if parsed:
+                        last_valid_parsed = parsed
+                        # Check if any chunk intended to have a visual was rejected by quality/security check
+                        try:
+                            raw_json_chunks = json.loads(content_text).get("chunks", [])
+                        except Exception:
+                            raw_json_chunks = []
 
-                    if needs_quality_retry:
-                        logger.warning(f"[VISUAL QUALITY RETRY] Attempt {attempt + 1} produced visual chunks that failed quality check (<input type='range'> missing). Triggering retry pass...")
-                        if attempt == 1:
-                            logger.warning("[VISUAL QUALITY REJECTED] Attempt 2 failed quality check. Setting has_visual=False for non-conforming chunks per quality contract.")
-                    else:
-                        logger.info(f"[VISUAL GENERATION SUCCESS] Attempt {attempt + 1} passed all security and quality checks with valid sliders and SVG.")
+                        needs_quality_retry = False
+                        for idx, r_chunk in enumerate(raw_json_chunks):
+                            if isinstance(r_chunk, dict) and r_chunk.get("has_visual"):
+                                if idx < len(parsed) and not parsed[idx]["has_visual"]:
+                                    needs_quality_retry = True
+                                    break
 
-                    if not needs_quality_retry or attempt == 1:
-                        return parsed
+                        if not needs_quality_retry or attempt >= 1:
+                            return parsed
 
-                    # On attempt 0 quality failure, append stricter reminder prompt and retry once
-                    payload["messages"].append({"role": "assistant", "content": content_text})
-                    payload["messages"].append({
-                        "role": "user",
-                        "content": (
-                            "QUALITY CHECK FAILED: Your generated visual lacked continuous range sliders (<input type='range'>), "
-                            "an <svg> diagram, or live JS event listeners. Please regenerate the JSON chunks following the "
-                            "REFERENCE STRUCTURAL TEMPLATE with continuous sliders for all variables, an SVG diagram, formula readout, and correct physical units."
-                        )
-                    })
+                        # On attempt 0 quality failure, append stricter reminder prompt and retry once
+                        payload["messages"].append({"role": "assistant", "content": content_text})
+                        payload["messages"].append({
+                            "role": "user",
+                            "content": (
+                                "QUALITY CHECK FAILED: Your generated visual lacked continuous range sliders (<input type='range'>), "
+                                "an <svg> diagram, or live JS event listeners. Please regenerate the JSON chunks following the "
+                                "REFERENCE STRUCTURAL TEMPLATE with continuous sliders for all variables, an SVG diagram, formula readout, and correct physical units."
+                            )
+                        })
+                else:
+                    logger.warning(f"[GROQ API RETRY] Request returned HTTP status {res.status_code} on attempt {attempt + 1}")
+                    await asyncio.sleep(1.0)
+            except Exception as e:
+                logger.warning(f"[GROQ API TIMEOUT/ERROR] Attempt {attempt + 1} failed: {e}")
+                await asyncio.sleep(1.0)
+
+    # Fallback safety: If we obtained a valid parsed text explanation during any attempt, return it even if visual quality check failed
+    if last_valid_parsed:
+        logger.info("[EXPLANATION FALLBACK] Returning text explanation chunks without non-conforming visual after retries.")
+        return last_valid_parsed
 
     raise HTTPException(status_code=422, detail="AI model failed to generate a structured explanation. Please try again.")
 
