@@ -4,7 +4,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import settings
+from src.config import settings, get_groq_api_key
 from src.models.learning_session import LearningSession
 from src.models.lesson_chat_message import LessonChatMessage
 from src.models.user_concept_gap import UserConceptGap
@@ -126,9 +126,10 @@ async def post_lesson_chat_message(
         f"Feel free to ask for code snippets or specific edge cases!"
     )
 
-    if settings.groq_api_key:
+    api_key = get_groq_api_key("chat")
+    if api_key:
         url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         payload = {
             "model": settings.groq_model,
             "messages": messages_payload,

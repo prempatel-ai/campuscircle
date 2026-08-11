@@ -33,6 +33,10 @@ class Settings(BaseSettings):
 
     # AI / Groq Learning API Configuration
     groq_api_key: str = ""
+    groq_api_key_explanation: str = ""
+    groq_api_key_quiz: str = ""
+    groq_api_key_chat: str = ""
+    groq_api_keys_pool: str = ""  # Comma-separated list of keys from multiple accounts for round-robin rotation
     groq_model: str = "llama-3.3-70b-versatile"
 
     # YouTube Transcript Proxy (Supadata — free 100 req/month, bypasses cloud IP blocks)
@@ -68,5 +72,42 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
+import itertools
+from typing import Optional
+
 # Single shared settings instance, imported everywhere else
 settings = Settings()
+
+_pool_cycle: Optional[itertools.cycle] = None
+
+
+def get_groq_api_key(feature: str = "explanation") -> str:
+    """
+    Returns the appropriate Groq API key for a given feature.
+    1. Checks feature-specific env var (groq_api_key_explanation, groq_api_key_quiz, groq_api_key_chat).
+    2. If groq_api_keys_pool is configured, cycles round-robin across multiple accounts.
+    3. Falls back to default groq_api_key or reva_groq_api_key.
+    """
+    global _pool_cycle
+
+    # 1. Feature-specific env key
+    if feature == "explanation" and settings.groq_api_key_explanation:
+        return settings.groq_api_key_explanation
+    if feature == "quiz" and settings.groq_api_key_quiz:
+        return settings.groq_api_key_quiz
+    if feature == "chat" and settings.groq_api_key_chat:
+        return settings.groq_api_key_chat
+
+    # 2. Round-robin key pool if provided
+    if settings.groq_api_keys_pool:
+        keys = [k.strip() for k in settings.groq_api_keys_pool.split(",") if k.strip()]
+        if keys:
+            if _pool_cycle is None:
+                _pool_cycle = itertools.cycle(keys)
+            return next(_pool_cycle)
+
+    # 3. Fallback to general keys
+    if feature == "chat" and settings.reva_groq_api_key:
+        return settings.reva_groq_api_key
+
+    return settings.groq_api_key or settings.reva_groq_api_key

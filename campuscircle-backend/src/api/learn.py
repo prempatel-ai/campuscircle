@@ -21,7 +21,7 @@ from youtube_transcript_api import (
     VideoUnavailable
 )
 
-from src.config import settings
+from src.config import settings, get_groq_api_key
 from src.database import get_db
 from src.auth.dependencies import get_current_user
 from src.models.learn import LearnExtractionLog
@@ -609,27 +609,9 @@ async def call_groq_api_for_explanation(
     career_goal: Optional[str] = None,
     previous_memories: Optional[List[str]] = None
 ) -> List[dict]:
-    if not settings.groq_api_key:
-        return [
-            {
-                "title": f"Core Concept & Overview ({language_name})",
-                "explanation": f"Here is a mock explanation breakdown for the transcript in {language_name}. Key ideas are presented step-by-step for easy mastery.",
-                "has_visual": True,
-                "visual_html": _MOCK_PHYSICS_VISUAL,
-            },
-            {
-                "title": f"Practical Application ({language_name})",
-                "explanation": f"This section demonstrates how to apply the fundamental principles to solve real-world problems in {language_name}.",
-                "has_visual": False,
-                "visual_html": None,
-            },
-            {
-                "title": f"Summary & Takeaways ({language_name})",
-                "explanation": f"To summarize: review the key formulas, test your understanding in the quiz, and practice applying these concepts.",
-                "has_visual": False,
-                "visual_html": None,
-            },
-        ]
+    api_key = get_groq_api_key("explanation")
+    if not api_key:
+        return _MOCK_CHUNKS
 
     goal_prompt = (
         f" The student's primary career goal is '{career_goal}'. Where relevant and natural, "
@@ -672,7 +654,7 @@ async def call_groq_api_for_explanation(
         "Return a JSON object with a single top-level key 'chunks' — a list where each item has exact keys: 'title', 'explanation', 'has_visual' (boolean), and 'visual_html' (string or null)."
     )
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": settings.groq_model,
         "messages": [
@@ -788,7 +770,8 @@ _MOCK_QUIZ = {
 
 
 async def call_groq_api_for_quiz(video_title: str, explanation_text: str, language_name: str = "English") -> dict:
-    if not settings.groq_api_key:
+    api_key = get_groq_api_key("quiz")
+    if not api_key:
         return _MOCK_QUIZ
 
     system_prompt = (
@@ -806,7 +789,7 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str, langua
         "- 'concept_category': string (a broad tag like 'System Design', 'Recursion', 'Fundamentals', 'Algorithms')."
     )
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": settings.groq_model,
         "messages": [
@@ -841,7 +824,8 @@ async def call_groq_api_for_single_phase(
     Generates a FRESH set of 10 multiple-choice questions for a specific retried phase in target language.
     Guarantees questions do NOT duplicate previous failed attempt questions.
     """
-    if not settings.groq_api_key:
+    api_key = get_groq_api_key("quiz")
+    if not api_key:
         phase_key = f"phase{phase}"
         return _MOCK_QUIZ.get("phases", {}).get(phase_key, {})
 
@@ -871,7 +855,7 @@ async def call_groq_api_for_single_phase(
         "- 'concept_category': string tag."
     )
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": settings.groq_model,
         "messages": [
@@ -899,7 +883,8 @@ async def call_groq_api_for_single_phase(
 
 
 async def call_groq_api_for_remediation(video_title: str, concept_title: str, original_explanation: str, language_name: str = "English") -> dict:
-    if not settings.groq_api_key:
+    api_key = get_groq_api_key("quiz")
+    if not api_key:
         return {
             "re_explanation": (
                 f"Let me explain '{concept_title}' with a fresh perspective! "
@@ -916,7 +901,7 @@ async def call_groq_api_for_remediation(video_title: str, concept_title: str, or
     )
 
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": settings.groq_model,
         "messages": [
