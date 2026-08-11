@@ -766,61 +766,90 @@ async def call_groq_api_for_explanation(
             except Exception as e:
                 logger.warning(f"[GROQ API TIMEOUT/ERROR] Attempt {attempt + 1} failed: {e}")
                 await asyncio.sleep(1.0)
-_MOCK_QUIZ = {
-    "phases": {
-        "phase1": {
-            "name": "Recall", "description": "Test basic memory of core terms and definitions.",
-            "questions": [
-                {"id": "p1_q1", "question": "What is the primary subject of this topic?", "options": ["Foundational concepts", "Historical background", "Unverified theories", "Admin guidelines"], "correct_index": 0, "explanation": "The material focuses on foundational concepts.", "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
-                {"id": "p1_q2", "question": "Why are building blocks introduced early?", "options": ["To confuse learners", "To build a mental framework", "To meet length requirements", "To skip real examples"], "correct_index": 1, "explanation": "They provide a framework for applying concepts later.", "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
-                {"id": "p1_q3", "question": "How should key terms be approached?", "options": ["Memorize without context", "Ignore definitions", "Connect to real scenarios", "Rely on luck"], "correct_index": 2, "explanation": "Connecting terms to examples solidifies understanding.", "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
-                {"id": "p1_q4", "question": "What role do definitions play in learning?", "options": ["They slow progress", "They anchor understanding", "They are optional", "They complicate things"], "correct_index": 1, "explanation": "Definitions anchor understanding for advanced concepts.", "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
-                {"id": "p1_q5", "question": "Which learning approach is most effective?", "options": ["Passive reading only", "Active recall and practice", "Skipping fundamentals", "Relying on memorization"], "correct_index": 1, "explanation": "Active recall strengthens retention and understanding.", "chunk_id": "chunk_1", "concept_category": "Application"},
-                {"id": "p1_q6", "question": "What is a prerequisite before advanced study?", "options": ["Mastering terminology", "Speed reading", "Ignoring basics", "Random exploration"], "correct_index": 0, "explanation": "Mastering terminology is essential before tackling advanced material.", "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
-                {"id": "p1_q7", "question": "How does structured learning differ from unstructured?", "options": ["It follows a logical sequence", "It is always faster", "It skips fundamentals", "It requires no effort"], "correct_index": 0, "explanation": "Structured learning builds concepts in a logical, progressive sequence.", "chunk_id": "chunk_1", "concept_category": "Application"},
-                {"id": "p1_q8", "question": "What is the purpose of examples in explanations?", "options": ["To fill space", "To ground abstract ideas in reality", "To confuse learners", "To replace definitions"], "correct_index": 1, "explanation": "Examples ground abstract ideas in reality for better understanding.", "chunk_id": "chunk_1", "concept_category": "Application"},
-                {"id": "p1_q9", "question": "Why is context important when learning terms?", "options": ["Context is irrelevant", "It helps retention and application", "It makes things harder", "It delays progress"], "correct_index": 1, "explanation": "Context helps retention and practical application of terms.", "chunk_id": "chunk_1", "concept_category": "Application"},
-                {"id": "p1_q10", "question": "What distinguishes a core concept from a detail?", "options": ["Core concepts are foundational and recurring", "Details are more important", "There is no difference", "Core concepts are always simpler"], "correct_index": 0, "explanation": "Core concepts are foundational principles that recur throughout the topic.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-            ],
-        },
-        "phase2": {
-            "name": "Application", "description": "Apply concepts to real-world scenarios and problems.",
-            "questions": [
-                {"id": "p2_q1", "question": "First step when hitting a bottleneck?", "options": ["Abandon", "Trace execution path", "Change random settings", "Blame dependencies"], "correct_index": 1, "explanation": "Tracing pinpoints the exact cause.", "chunk_id": "chunk_1", "concept_category": "Application"},
-                {"id": "p2_q2", "question": "How does scenario framing help?", "options": ["Isolates variables", "Adds complexity", "Hides flaws", "Removes testing"], "correct_index": 0, "explanation": "It isolates variables and predicts outcomes.", "chunk_id": "chunk_1", "concept_category": "Application"},
-                {"id": "p2_q3", "question": "Common implementation trade-off?", "options": ["Simplicity vs Scalability", "Color vs Font", "Users vs Location", "None"], "correct_index": 0, "explanation": "Engineers balance simplicity against scaling demands.", "chunk_id": "chunk_1", "concept_category": "Application"},
-                {"id": "p2_q4", "question": "When should you optimize prematurely?", "options": ["Never, measure first", "Always, at the start", "Only on weekends", "When the code looks slow"], "correct_index": 0, "explanation": "Premature optimization wastes effort; always measure first.", "chunk_id": "chunk_1", "concept_category": "Application"},
-                {"id": "p2_q5", "question": "How do you validate a proposed solution?", "options": ["Test against edge cases", "Trust intuition alone", "Skip testing", "Ask random people"], "correct_index": 0, "explanation": "Testing against edge cases validates solution correctness.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p2_q6", "question": "What makes debugging systematic?", "options": ["Reproducing, isolating, then fixing", "Randomly changing code", "Restarting the server", "Ignoring error logs"], "correct_index": 0, "explanation": "Systematic debugging follows reproduce, isolate, fix methodology.", "chunk_id": "chunk_1", "concept_category": "Application"},
-                {"id": "p2_q7", "question": "When is abstraction beneficial?", "options": ["When it hides unnecessary complexity", "Always, without exception", "Never", "Only in documentation"], "correct_index": 0, "explanation": "Abstraction is beneficial when it simplifies by hiding irrelevant complexity.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p2_q8", "question": "How should you handle conflicting requirements?", "options": ["Prioritize by impact and feasibility", "Implement all at once", "Ignore some", "Choose randomly"], "correct_index": 0, "explanation": "Prioritizing by impact and feasibility resolves conflicting requirements.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p2_q9", "question": "What indicates a well-designed component?", "options": ["Single responsibility and clear interfaces", "Maximum features", "Complex internals", "Tight coupling"], "correct_index": 0, "explanation": "Good components have a single responsibility and clear interfaces.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p2_q10", "question": "Why is iterative development preferred?", "options": ["Enables early feedback and course correction", "It is slower", "It avoids planning", "It requires no testing"], "correct_index": 0, "explanation": "Iterative development enables early feedback loops and timely correction.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-            ],
-        },
-        "phase3": {
-            "name": "Synthesis", "description": "Synthesise and evaluate complex systems and trade-offs.",
-            "questions": [
-                {"id": "p3_q1", "question": "How do principles ensure reliability?", "options": ["Modular boundaries + verification", "Manual inspection", "Ignoring edge cases", "Hardcoding parameters"], "correct_index": 0, "explanation": "Modular design and verification ensure resilience.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p3_q2", "question": "Ultimate mastery goal?", "options": ["Pass one test", "Design and adapt solutions", "Copy templates", "Avoid discussions"], "correct_index": 1, "explanation": "Mastery means synthesising knowledge to solve novel problems.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p3_q3", "question": "Paramount architectural criterion?", "options": ["Social media popularity", "Domain fit and maintainability", "Fewest code lines", "Arbitrary preference"], "correct_index": 1, "explanation": "Maintainability and domain alignment drive the best choice.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p3_q4", "question": "How do you evaluate competing approaches?", "options": ["Compare trade-offs against constraints", "Pick the newest one", "Choose the simplest always", "Flip a coin"], "correct_index": 0, "explanation": "Evaluating trade-offs against domain constraints yields the best approach.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p3_q5", "question": "What makes knowledge transfer effective?", "options": ["Clear documentation and shared mental models", "Verbal instructions only", "No documentation needed", "Copy-pasting code"], "correct_index": 0, "explanation": "Clear documentation and shared mental models enable effective knowledge transfer.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p3_q6", "question": "When should you break a system into microservices?", "options": ["When independent scaling and deployment are needed", "Always, for every project", "Never", "When the team is small"], "correct_index": 0, "explanation": "Microservices are justified when components need independent scaling.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p3_q7", "question": "How does feedback loop quality affect outcomes?", "options": ["Faster, more accurate loops lead to better outcomes", "Loops are unnecessary", "Slower loops are better", "Feedback is only for managers"], "correct_index": 0, "explanation": "Faster and more accurate feedback loops consistently produce better outcomes.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p3_q8", "question": "What is the risk of over-engineering?", "options": ["Wasted effort on unused abstractions", "Better code quality", "No risk at all", "Faster delivery"], "correct_index": 0, "explanation": "Over-engineering wastes effort on abstractions that may never be needed.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p3_q9", "question": "How do you measure learning effectiveness?", "options": ["Ability to apply concepts to novel problems", "Pages read", "Time spent studying", "Number of certificates"], "correct_index": 0, "explanation": "True effectiveness is measured by applying concepts to novel, unseen problems.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-                {"id": "p3_q10", "question": "What integrates all phases of understanding?", "options": ["Connecting recall, application, and critical evaluation", "Memorization alone", "Skipping fundamentals", "Avoiding challenges"], "correct_index": 0, "explanation": "Full understanding connects recall, practical application, and critical evaluation.", "chunk_id": "chunk_2", "concept_category": "Synthesis"},
-            ],
-        },
+def get_mock_quiz(language_name: str = "English") -> dict:
+    lang_lower = str(language_name).lower()
+    if "gujarati" in lang_lower or "ગુજરાતી" in lang_lower:
+        q1 = "આ વિષયનો મુખ્ય સિદ્ધાંત શું છે?"
+        opts1 = ["મૂળભૂત વિભાવનાઓ", "ઐતિહાસિક પૃષ્ઠભૂમિ", "અપ્રમાણિત સિદ્ધાંતો", "વહીવટી માર્ગદર્શિકા"]
+        exp1 = "આ પાઠ મુખ્યત્વે આ વિષયની મૂળભૂત વિભાવનાઓ પર ધ્યાન કેન્દ્રિત કરે છે."
+        q2 = "મૂળભૂત ખ્યાલો શા માટે પહેલાં શીખવવામાં આવે છે?"
+        opts2 = ["વિદ્યાર્થીઓને ગૂંચવવા", "મજબૂત માનસિક માળખું બનાવવા", "સમય પસાર કરવા", "ઉદાહરણો છોડવા"]
+        exp2 = "તેઓ પછીથી જટિલ સમસ્યાઓ ઉકેલવા માટે એક મજબૂત આધાર પૂરો પાડે છે."
+    elif "hindi" in lang_lower or "हिंदी" in lang_lower:
+        q1 = "इस विषय का मुख्य सिद्धांत क्या है?"
+        opts1 = ["मौलिक अवधारणाएं", "ऐतिहासिक पृष्ठभूमि", "अप्रमाणित सिद्धांत", "प्रशासनिक दिशा-निर्देश"]
+        exp1 = "पाठ मुख्य रूप से इस विषय की मौलिक अवधारणाओं पर ध्यान केंद्रित करता है।"
+        q2 = "बुनियादी अवधारणाएं पहले क्यों सिखाई जाती हैं?"
+        opts2 = ["छात्रों को भ्रमित करने के लिए", "मजबूत मानसिक ढांचा बनाने के लिए", "समय बिताने के लिए", "उदाहरण छोड़ने के लिए"]
+        exp2 = "वे बाद में जटिल समस्याओं को हल करने के लिए एक मजबूत आधार प्रदान करती हैं।"
+    elif "spanish" in lang_lower or "español" in lang_lower:
+        q1 = "¿Cuál es el concepto principal de este tema?"
+        opts1 = ["Conceptos fundamentales", "Antecedentes históricos", "Teorías no verificadas", "Pautas administrativas"]
+        exp1 = "El material se centra principalmente en conceptos fundamentales."
+        q2 = "¿Por qué se enseñan primero los conceptos básicos?"
+        opts2 = ["Para confundir", "Para construir un marco mental sólido", "Para pasar el tiempo", "Para omitir ejemplos"]
+        exp2 = "Proporcionan una base sólida para resolver problemas complejos más adelante."
+    elif "french" in lang_lower or "français" in lang_lower:
+        q1 = "Quel est le concept principal de ce sujet ?"
+        opts1 = ["Concepts fondamentaux", "Contexte historique", "Théories non vérifiées", "Directives administratives"]
+        exp1 = "Le document se concentre principalement sur des concepts fondamentaux."
+        q2 = "Pourquoi les concepts de base sont-ils enseignés en premier ?"
+        opts2 = ["Pour rendre confus", "Pour construire un cadre mental solide", "Pour passer le temps", "Pour sauter des exemples"]
+        exp2 = "Ils fournissent une base solide pour résoudre des problèmes complexes plus tard."
+    else:
+        q1 = "What is the primary subject of this topic?"
+        opts1 = ["Foundational concepts", "Historical background", "Unverified theories", "Admin guidelines"]
+        exp1 = "The material focuses primarily on foundational concepts."
+        q2 = "Why are foundational concepts introduced early?"
+        opts2 = ["To confuse learners", "To build a strong mental framework", "To pass time", "To skip real examples"]
+        exp2 = "They provide a solid framework for solving complex problems later."
+
+    return {
+        "phases": {
+            "phase1": {
+                "name": "Recall",
+                "description": f"Test core terms in {language_name}.",
+                "questions": [
+                    {"id": "p1_q1", "question": q1, "options": opts1, "correct_index": 0, "explanation": exp1, "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
+                    {"id": "p1_q2", "question": q2, "options": opts2, "correct_index": 1, "explanation": exp2, "chunk_id": "chunk_0", "concept_category": "Fundamentals"},
+                    {"id": "p1_q3", "question": q1, "options": opts1, "correct_index": 0, "explanation": exp1, "chunk_id": "chunk_1", "concept_category": "Application"},
+                    {"id": "p1_q4", "question": q2, "options": opts2, "correct_index": 1, "explanation": exp2, "chunk_id": "chunk_1", "concept_category": "Application"},
+                    {"id": "p1_q5", "question": q1, "options": opts1, "correct_index": 0, "explanation": exp1, "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                ]
+            },
+            "phase2": {
+                "name": "Application",
+                "description": f"Apply concepts in {language_name}.",
+                "questions": [
+                    {"id": "p2_q1", "question": q2, "options": opts2, "correct_index": 1, "explanation": exp2, "chunk_id": "chunk_1", "concept_category": "Application"},
+                    {"id": "p2_q2", "question": q1, "options": opts1, "correct_index": 0, "explanation": exp1, "chunk_id": "chunk_1", "concept_category": "Application"},
+                    {"id": "p2_q3", "question": q2, "options": opts2, "correct_index": 1, "explanation": exp2, "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                    {"id": "p2_q4", "question": q1, "options": opts1, "correct_index": 0, "explanation": exp1, "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                    {"id": "p2_q5", "question": q2, "options": opts2, "correct_index": 1, "explanation": exp2, "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                ]
+            },
+            "phase3": {
+                "name": "Synthesis",
+                "description": f"Synthesise concepts in {language_name}.",
+                "questions": [
+                    {"id": "p3_q1", "question": q1, "options": opts1, "correct_index": 0, "explanation": exp1, "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                    {"id": "p3_q2", "question": q2, "options": opts2, "correct_index": 1, "explanation": exp2, "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                    {"id": "p3_q3", "question": q1, "options": opts1, "correct_index": 0, "explanation": exp1, "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                    {"id": "p3_q4", "question": q2, "options": opts2, "correct_index": 1, "explanation": exp2, "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                    {"id": "p3_q5", "question": q1, "options": opts1, "correct_index": 0, "explanation": exp1, "chunk_id": "chunk_2", "concept_category": "Synthesis"},
+                ]
+            }
+        }
     }
-}
+
+
+_MOCK_QUIZ = get_mock_quiz("English")
 
 
 async def call_groq_api_for_quiz(video_title: str, explanation_text: str, language_name: str = "English") -> dict:
     api_key = get_groq_api_key("quiz")
     if not api_key:
-        return _MOCK_QUIZ
+        return get_mock_quiz(language_name)
 
     system_prompt = (
         "You are an expert AI assessment designer. Create a 3-phase multiple-choice quiz. "
@@ -865,8 +894,8 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str, langua
                 logger.warning(f"[QUIZ GROQ TIMEOUT/ERROR] Attempt {attempt + 1} failed: {e}")
                 await asyncio.sleep(1.0)
 
-    logger.warning("[QUIZ FALLBACK] Returning mock quiz structure as fallback after Groq retries.")
-    return _MOCK_QUIZ
+    logger.warning(f"[QUIZ FALLBACK] Returning mock quiz structure in {language_name} after Groq retries.")
+    return get_mock_quiz(language_name)
 
 
 async def call_groq_api_for_single_phase(
@@ -883,7 +912,7 @@ async def call_groq_api_for_single_phase(
     api_key = get_groq_api_key("quiz")
     if not api_key:
         phase_key = f"phase{phase}"
-        return _MOCK_QUIZ.get("phases", {}).get(phase_key, {})
+        return get_mock_quiz(language_name).get("phases", {}).get(phase_key, {})
 
     exclude_prompt = ""
     if exclude_questions and len(exclude_questions) > 0:
@@ -1247,6 +1276,30 @@ def sanitize_phase_questions(phase_dict: dict) -> List[QuizQuestionOut]:
     ]
 
 
+def is_quiz_in_wrong_language(quiz_data: dict, target_lang_code: str) -> bool:
+    if not quiz_data or target_lang_code == "en":
+        return False
+    phases = quiz_data.get("phases", {})
+    p1 = phases.get("phase1", {})
+    questions = p1.get("questions", [])
+    if not questions or not isinstance(questions, list):
+        return True
+
+    first_q_text = str(questions[0].get("question", "")).strip()
+
+    # For Indic languages (Gujarati 'gu', Hindi 'hi'), check for Indic Unicode characters (>= 0x0900)
+    if target_lang_code in ["gu", "hi"]:
+        has_indic_char = any(ord(c) >= 0x0900 for c in first_q_text)
+        if not has_indic_char:
+            return True
+
+    # If question contains English mock text
+    if "What is the primary subject" in first_q_text or "Why are foundational concepts" in first_q_text:
+        return True
+
+    return False
+
+
 @router.post("/{session_id}/quiz", response_model=QuizSessionOut, status_code=200, summary="Get/generate 3-phase quiz in session language")
 async def get_or_create_quiz(
     session_id: str,
@@ -1265,13 +1318,15 @@ async def get_or_create_quiz(
 
     lang_name = SUPPORTED_LANGUAGES.get(session.language, "English")
 
-    if not session.quiz_data:
+    if not session.quiz_data or is_quiz_in_wrong_language(session.quiz_data, session.language):
         explanation_text = " ".join(c["explanation"] for c in session.explanation_chunks.get("chunks", []))
         session.quiz_data = await call_groq_api_for_quiz(session.video_title, explanation_text or session.transcript, language_name=lang_name)
         session.user_progress = {
             "current_phase": 1, "phase1_passed": False,
             "phase2_passed": False, "phase3_passed": False, "is_completed": False,
         }
+        flag_modified(session, "quiz_data")
+        flag_modified(session, "user_progress")
         db.add(session)
         await db.commit()
         await db.refresh(session)
