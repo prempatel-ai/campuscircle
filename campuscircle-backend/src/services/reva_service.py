@@ -5,7 +5,7 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import settings
+from src.config import settings, get_groq_api_key
 from src.models.user import User
 from src.models.university import University
 from src.models.post import Post
@@ -13,7 +13,7 @@ from src.models.comment import Comment
 
 
 def get_effective_reva_key() -> str:
-    return settings.reva_groq_api_key or settings.groq_api_key
+    return get_groq_api_key("chat") or settings.reva_groq_api_key or settings.groq_api_key
 
 
 async def get_or_create_reva_user(db: AsyncSession) -> User:
@@ -204,11 +204,14 @@ async def evaluate_and_generate_chat_visual(
         return None
 
     # 1. Check cache first
-    cache_stmt = select(RevaVisualCache).where(RevaVisualCache.normalized_query == normalized).limit(1)
-    cache_res = await db.execute(cache_stmt)
-    cached = cache_res.scalar_one_or_none()
-    if cached:
-        return {"title": cached.title, "visual_html": cached.visual_html}
+    try:
+        cache_stmt = select(RevaVisualCache).where(RevaVisualCache.normalized_query == normalized).limit(1)
+        cache_res = await db.execute(cache_stmt)
+        cached = cache_res.scalar_one_or_none()
+        if cached:
+            return {"title": cached.title, "visual_html": cached.visual_html}
+    except Exception as ce:
+        print(f"[REVA VISUAL CACHE CHECK ERROR]: {ce}")
 
     # 2. Check STEM suitability heuristic / AI evaluation
     stem_keywords = [
@@ -216,51 +219,59 @@ async def evaluate_and_generate_chat_visual(
         "velocity", "archimedes", "buoyancy", "pendulum", "wave", "frequency",
         "circuit", "resistor", "voltage", "current", "ohm", "algorithm", "binary search",
         "sorting", "tree", "graph", "vector", "matrix", "derivative", "integral", "trigonometry",
-        "pythagoras", "projectile", "momentum", "energy", "work", "power", "thermodynamics"
+        "pythagoras", "projectile", "momentum", "energy", "work", "power", "thermodynamics",
+        "hydraulic", "hydrolic", "pneumatic", "fluid", "pressure", "pascal", "bernoulli"
     ]
     is_stem_topic = any(kw in normalized for kw in stem_keywords)
 
     if not is_stem_topic:
-        api_key = get_effective_reva_key()
-        if api_key:
-            try:
-                eval_prompt = (
-                    "Evaluate if the user's prompt is a STEM, physics, math, engineering, or computer science concept "
-                    "where an interactive visual slider simulation (with inputs driving live diagram and equation readouts) "
-                    "would MEANINGFULLY help teach it.\n"
-                    "Respond with JSON: {\"is_visualizable\": true/false, \"title\": \"Short Title\"}"
-                )
-                url = "https://api.groq.com/openai/v1/chat/completions"
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                payload = {
-                    "model": settings.reva_groq_model,
-                    "messages": [
-                        {"role": "system", "content": eval_prompt},
-                        {"role": "user", "content": user_message}
-                    ],
-                    "response_format": {"type": "json_object"},
-                    "temperature": 0.1,
-                    "max_tokens": 100,
-                }
-                async with httpx.AsyncClient(timeout=8.0) as client:
-                    res = await client.post(url, headers=headers, json=payload)
-                    if res.status_code == 200:
-                        eval_data = res.json()["choices"][0]["message"]["content"]
-                        eval_json = json.loads(eval_data)
-                        if eval_json.get("is_visualizable"):
-                            is_stem_topic = True
-            except Exception:
-                pass
+        # Only invoke LLM visual evaluation if user explicitly asks for visual/STEM concept
+        explicit_triggers = ["explain", "demonstrate", "simulation", "diagram", "visual", "interactive", "how does", "what is"]
+        has_trigger = any(tr in normalized for tr in explicit_triggers)
+        if has_trigger and len(normalized.split()) >= 3:
+            api_key = get_effective_reva_key()
+            if api_key:
+                try:
+                    eval_prompt = (
+                        "Evaluate if the user's prompt is a STEM, physics, math, engineering, or computer science concept "
+                        "where an interactive visual slider simulation (with inputs driving live diagram and equation readouts) "
+                        "would MEANINGFULLY help teach it.\n"
+                        "Respond with JSON: {\"is_visualizable\": true/false, \"title\": \"Short Title\"}"
+                    )
+                    url = "https://api.groq.com/openai/v1/chat/completions"
+                    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+                    payload = {
+                        "model": settings.reva_groq_model,
+                        "messages": [
+                            {"role": "system", "content": eval_prompt},
+                            {"role": "user", "content": user_message}
+                        ],
+                        "response_format": {"type": "json_object"},
+                        "temperature": 0.1,
+                        "max_tokens": 100,
+                    }
+                    async with httpx.AsyncClient(timeout=6.0) as client:
+                        res = await client.post(url, headers=headers, json=payload)
+                        if res.status_code == 200:
+                            eval_data = res.json()["choices"][0]["message"]["content"]
+                            eval_json = json.loads(eval_data)
+                            if eval_json.get("is_visualizable"):
+                                is_stem_topic = True
+                except Exception:
+                    pass
 
     if not is_stem_topic:
         return None
 
     # 3. Check rate limit if user_id is provided
     if user_id:
-        allowed = await check_and_increment_visual_rate_limit(db, user_id)
-        if not allowed:
-            print(f"[REVA VISUAL] User {user_id} reached daily 5 chat visual limit.")
-            return None
+        try:
+            allowed = await check_and_increment_visual_rate_limit(db, user_id)
+            if not allowed:
+                print(f"[REVA VISUAL] User {user_id} reached daily 5 chat visual limit.")
+                return None
+        except Exception as rle:
+            print(f"[REVA RATE LIMIT ERROR]: {rle}")
 
     # 4. Generate Visual using exact Learn module pipeline & quality checks
     from src.api.learn import validate_and_sanitize_visual_html, validate_visual_quality_check, _MOCK_PHYSICS_VISUAL
@@ -303,7 +314,7 @@ async def evaluate_and_generate_chat_visual(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=35.0) as client:
+        async with httpx.AsyncClient(timeout=25.0) as client:
             res = await client.post(url, headers=headers, json=payload)
             if res.status_code == 200:
                 data = res.json()
@@ -317,13 +328,16 @@ async def evaluate_and_generate_chat_visual(
                     is_valid_qual = validate_visual_quality_check(clean_html) if is_valid_sec else False
 
                     if is_valid_sec and is_valid_qual:
-                        cache_record = RevaVisualCache(
-                            normalized_query=normalized,
-                            title=title,
-                            visual_html=clean_html
-                        )
-                        db.add(cache_record)
-                        await db.flush()
+                        try:
+                            cache_record = RevaVisualCache(
+                                normalized_query=normalized,
+                                title=title,
+                                visual_html=clean_html
+                            )
+                            db.add(cache_record)
+                            await db.flush()
+                        except Exception:
+                            pass
                         return {"title": title, "visual_html": clean_html}
                     else:
                         print("[REVA VISUAL] Generated visual failed quality/security gate. Falling back to text-only.")
@@ -345,18 +359,31 @@ async def generate_reva_chat_response(
     Queries recent active posts across the platform/university for RAG context.
     Evaluates and attaches an inline interactive visual if prompt is STEM/visualizable.
     """
-    api_key = get_effective_reva_key()
+    # 1. Safely evaluate visual without blocking main chat if error occurs
+    visual_data = None
+    try:
+        visual_data = await evaluate_and_generate_chat_visual(
+            user_message=user_message,
+            user_id=user_id,
+            db=db
+        )
+    except Exception as ve:
+        print(f"[Reva Visual Eval Error]: {ve}")
 
-    # RAG Context: Fetch up to 5 recent posts for campus context
-    recent_posts_stmt = (
-        select(Post.title, Post.content, User.username)
-        .join(User, User.id == Post.author_id)
-        .where(Post.is_deleted == False)
-        .order_by(Post.created_at.desc())
-        .limit(5)
-    )
-    posts_res = await db.execute(recent_posts_stmt)
-    campus_posts = posts_res.all()
+    # 2. RAG Context: Fetch up to 5 recent posts for campus context
+    campus_posts = []
+    try:
+        recent_posts_stmt = (
+            select(Post.title, Post.content, User.username)
+            .join(User, User.id == Post.author_id)
+            .where(Post.is_deleted == False)
+            .order_by(Post.created_at.desc())
+            .limit(5)
+        )
+        posts_res = await db.execute(recent_posts_stmt)
+        campus_posts = posts_res.all()
+    except Exception as pe:
+        print(f"[Reva RAG Error]: {pe}")
 
     context_summary = "\n".join(
         f"- @{author}: '{title}' — {content[:150]}..."
@@ -390,24 +417,6 @@ async def generate_reva_chat_response(
         f"Internal Campus Background Context:\n{context_summary if context_summary else 'No recent public posts.'}"
     )
 
-    visual_data = await evaluate_and_generate_chat_visual(
-        user_message=user_message,
-        user_id=user_id,
-        db=db
-    )
-
-    if not api_key:
-        return {
-            "reply": (
-                "Hello! I am Reva, your CampusCircle AI Assistant. "
-                "I am currently running in local demonstration mode. "
-                "To unlock full AI conversation capabilities powered by Groq, add REVA_GROQ_API_KEY to your backend .env file!"
-            ),
-            "context_posts_count": len(campus_posts),
-            "visual_html": visual_data.get("visual_html") if visual_data else None,
-            "visual_title": visual_data.get("title") if visual_data else None,
-        }
-
     formatted_messages = [{"role": "system", "content": system_prompt}]
     for msg in conversation_history[-6:]:
         role = "user" if msg.get("sender") == "user" else "assistant"
@@ -415,29 +424,49 @@ async def generate_reva_chat_response(
 
     formatted_messages.append({"role": "user", "content": user_message})
 
+    # Multi-model and multi-key retry loop for rock-solid reliability
+    fallback_models = [settings.reva_groq_model, "llama-3.1-8b-instant", "mixtral-8x7b-32768", "llama3-70b-8192"]
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {
-        "model": settings.reva_groq_model,
-        "messages": formatted_messages,
-        "temperature": 0.6,
-        "max_tokens": 600,
-    }
 
-    try:
-        async with httpx.AsyncClient(timeout=25.0) as client:
-            res = await client.post(url, headers=headers, json=payload)
-            if res.status_code == 200:
-                data = res.json()
-                reply = data["choices"][0]["message"]["content"].strip()
-                return {
-                    "reply": reply,
-                    "context_posts_count": len(campus_posts),
-                    "visual_html": visual_data.get("visual_html") if visual_data else None,
-                    "visual_title": visual_data.get("title") if visual_data else None,
-                }
-    except Exception as e:
-        print(f"[Reva Chat Error]: {e}")
+    for attempt in range(4):
+        api_key = get_groq_api_key("chat") or get_effective_reva_key()
+        if not api_key:
+            return {
+                "reply": (
+                    "Hello! I am Reva, your CampusCircle AI Assistant. "
+                    "I am currently running in local demonstration mode. "
+                    "To unlock full AI conversation capabilities powered by Groq, add REVA_GROQ_API_KEY to your backend .env file!"
+                ),
+                "context_posts_count": len(campus_posts),
+                "visual_html": visual_data.get("visual_html") if visual_data else None,
+                "visual_title": visual_data.get("title") if visual_data else None,
+            }
+
+        model = fallback_models[attempt % len(fallback_models)]
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        payload = {
+            "model": model,
+            "messages": formatted_messages,
+            "temperature": 0.6,
+            "max_tokens": 600,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                res = await client.post(url, headers=headers, json=payload)
+                if res.status_code == 200:
+                    data = res.json()
+                    reply = data["choices"][0]["message"]["content"].strip()
+                    return {
+                        "reply": reply,
+                        "context_posts_count": len(campus_posts),
+                        "visual_html": visual_data.get("visual_html") if visual_data else None,
+                        "visual_title": visual_data.get("title") if visual_data else None,
+                    }
+                else:
+                    print(f"[Reva Chat Retry {attempt+1}] Groq returned {res.status_code} on model {model}: {res.text[:120]}")
+        except Exception as e:
+            print(f"[Reva Chat Retry {attempt+1} Error]: {e}")
 
     return {
         "reply": "I'm having trouble connecting to my neural core right now. Please try asking your question again in a moment!",
