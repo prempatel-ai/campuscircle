@@ -171,12 +171,14 @@ async def test_call_groq_api_for_single_phase_fallback():
 def test_get_groq_api_key_feature_and_pool():
     from src.config import settings, get_groq_api_key
     old_exp_key = settings.groq_api_key_explanation
+    old_quiz_key = settings.groq_api_key_quiz
     old_pool = settings.groq_api_keys_pool
     try:
         settings.groq_api_key_explanation = "gsk_explanation_account_key"
         assert get_groq_api_key("explanation") == "gsk_explanation_account_key"
 
         settings.groq_api_key_explanation = ""
+        settings.groq_api_key_quiz = ""
         settings.groq_api_keys_pool = "gsk_key1, gsk_key2"
         k1 = get_groq_api_key("quiz")
         k2 = get_groq_api_key("quiz")
@@ -184,4 +186,5 @@ def test_get_groq_api_key_feature_and_pool():
         assert k2 in ["gsk_key1", "gsk_key2"]
     finally:
         settings.groq_api_key_explanation = old_exp_key
+        settings.groq_api_key_quiz = old_quiz_key
         settings.groq_api_keys_pool = old_pool

@@ -715,8 +715,8 @@ async def call_groq_api_for_explanation(
         f"```html\n{_MOCK_PHYSICS_VISUAL}\n```\n\n"
         "Return a JSON object with a single top-level key 'chunks' — a list where each item has exact keys: 'title', 'explanation', 'has_visual' (boolean), and 'visual_html' (string or null)."
     )
+    fallback_models = [settings.groq_model, "llama-3.1-8b-instant", "mixtral-8x7b-32768", "llama3-70b-8192"]
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": settings.groq_model,
         "messages": [
@@ -730,8 +730,16 @@ async def call_groq_api_for_explanation(
 
     last_valid_parsed = None
 
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        for attempt in range(3):
+    async with httpx.AsyncClient(timeout=40.0) as client:
+        for attempt in range(4):
+            current_key = get_groq_api_key("explanation") or settings.groq_api_key
+            if not current_key:
+                break
+
+            current_model = fallback_models[attempt % len(fallback_models)]
+            headers = {"Authorization": f"Bearer {current_key}", "Content-Type": "application/json"}
+            payload["model"] = current_model
+
             try:
                 res = await client.post(url, headers=headers, json=payload)
                 if res.status_code == 200:
@@ -752,10 +760,10 @@ async def call_groq_api_for_explanation(
                                     needs_quality_retry = True
                                     break
 
-                        if not needs_quality_retry or attempt >= 1:
+                        if not needs_quality_retry or attempt >= 2:
                             return parsed
 
-                        # On attempt 0 quality failure, append stricter reminder prompt and retry once
+                        # On attempt 0/1 quality failure, append stricter reminder prompt and retry
                         payload["messages"].append({"role": "assistant", "content": content_text})
                         payload["messages"].append({
                             "role": "user",
@@ -766,13 +774,17 @@ async def call_groq_api_for_explanation(
                             )
                         })
                 else:
-                    logger.warning(f"[GROQ API RETRY] Request returned HTTP status {res.status_code} on attempt {attempt + 1}")
+                    logger.warning(f"[GROQ EXPLANATION RETRY] Status {res.status_code} on model {current_model} (attempt {attempt + 1})")
                     await asyncio.sleep(1.0)
             except Exception as e:
-                logger.warning(f"[GROQ API TIMEOUT/ERROR] Attempt {attempt + 1} failed: {e}")
+                logger.warning(f"[GROQ EXPLANATION ERROR] Attempt {attempt + 1} ({current_model}) failed: {e}")
                 await asyncio.sleep(1.0)
 
-    raise HTTPException(status_code=502, detail="Failed to generate explanation from AI provider (API Limits Reached). Please try again.")
+    if last_valid_parsed:
+        return last_valid_parsed
+
+    logger.warning("[GROQ EXPLANATION EXHAUSTED] Returning storytelling fallback chunks.")
+    return _MOCK_CHUNKS
 
 def get_mock_quiz(language_name: str = "English") -> dict:
     lang_lower = str(language_name).lower()
@@ -873,8 +885,8 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str, langua
         "- 'chunk_id': string (e.g. 'chunk_0', 'chunk_1', 'chunk_2')\n"
         "- 'concept_category': string (a broad tag like 'System Design', 'Recursion', 'Fundamentals', 'Algorithms')."
     )
+    fallback_models = [settings.groq_model, "llama-3.1-8b-instant", "mixtral-8x7b-32768", "llama3-70b-8192"]
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": settings.groq_model,
         "messages": [
@@ -886,8 +898,16 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str, langua
         "max_tokens": 4096,
     }
 
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        for attempt in range(3):
+    async with httpx.AsyncClient(timeout=40.0) as client:
+        for attempt in range(4):
+            current_key = get_groq_api_key("quiz") or settings.groq_api_key
+            if not current_key:
+                break
+
+            current_model = fallback_models[attempt % len(fallback_models)]
+            headers = {"Authorization": f"Bearer {current_key}", "Content-Type": "application/json"}
+            payload["model"] = current_model
+
             try:
                 res = await client.post(url, headers=headers, json=payload)
                 if res.status_code == 200:
@@ -896,10 +916,10 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str, langua
                     if validated:
                         return validated
                 else:
-                    logger.warning(f"[QUIZ GROQ RETRY] Status {res.status_code} on attempt {attempt + 1}")
+                    logger.warning(f"[QUIZ GROQ RETRY] Status {res.status_code} on model {current_model} (attempt {attempt + 1})")
                     await asyncio.sleep(1.0)
             except Exception as e:
-                logger.warning(f"[QUIZ GROQ TIMEOUT/ERROR] Attempt {attempt + 1} failed: {e}")
+                logger.warning(f"[QUIZ GROQ TIMEOUT/ERROR] Attempt {attempt + 1} ({current_model}) failed: {e}")
                 await asyncio.sleep(1.0)
 
     logger.warning(f"[QUIZ FALLBACK] Returning mock quiz structure in {language_name} after Groq retries.")
@@ -947,8 +967,8 @@ async def call_groq_api_for_single_phase(
         "- 'chunk_id': string (e.g. 'chunk_0', 'chunk_1', 'chunk_2')\n"
         "- 'concept_category': string tag."
     )
+    fallback_models = [settings.groq_model, "llama-3.1-8b-instant", "mixtral-8x7b-32768", "llama3-70b-8192"]
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": settings.groq_model,
         "messages": [
@@ -960,19 +980,35 @@ async def call_groq_api_for_single_phase(
     }
 
     async with httpx.AsyncClient(timeout=35.0) as client:
-        for _ in range(2):
-            res = await client.post(url, headers=headers, json=payload)
-            if res.status_code == 200:
-                content = res.json()["choices"][0]["message"]["content"]
-                parsed = json.loads(content) if isinstance(content, str) else content
-                if isinstance(parsed, dict) and isinstance(parsed.get("questions"), list) and len(parsed["questions"]) >= 5:
-                    return {
-                        "name": parsed.get("name", phase_names.get(phase, f"Phase {phase}")),
-                        "description": parsed.get("description", phase_descs.get(phase, "")),
-                        "questions": parsed["questions"]
-                    }
+        for attempt in range(3):
+            current_key = get_groq_api_key("quiz") or settings.groq_api_key
+            if not current_key:
+                break
+            current_model = fallback_models[attempt % len(fallback_models)]
+            headers = {"Authorization": f"Bearer {current_key}", "Content-Type": "application/json"}
+            payload["model"] = current_model
 
-    raise HTTPException(status_code=422, detail=f"Failed to generate fresh questions for Phase {phase}. Please try again.")
+            try:
+                res = await client.post(url, headers=headers, json=payload)
+                if res.status_code == 200:
+                    content = res.json()["choices"][0]["message"]["content"]
+                    parsed = json.loads(content) if isinstance(content, str) else content
+                    if isinstance(parsed, dict) and isinstance(parsed.get("questions"), list) and len(parsed["questions"]) >= 5:
+                        return {
+                            "name": parsed.get("name", phase_names.get(phase, f"Phase {phase}")),
+                            "description": parsed.get("description", phase_descs.get(phase, "")),
+                            "questions": parsed["questions"]
+                        }
+            except Exception:
+                pass
+
+    logger.warning(f"[SINGLE PHASE QUIZ FALLBACK] Returning mock phase {phase} questions in {language_name}.")
+    phase_key = f"phase{phase}"
+    return get_mock_quiz(language_name).get("phases", {}).get(phase_key, {
+        "name": phase_names.get(phase, f"Phase {phase}"),
+        "description": phase_descs.get(phase, ""),
+        "questions": []
+    })
 
 
 async def call_groq_api_for_remediation(video_title: str, concept_title: str, original_explanation: str, language_name: str = "English") -> dict:
