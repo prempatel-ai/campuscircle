@@ -105,6 +105,101 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 
+_MOCK_PHYSICS_VISUAL = """<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    :root { --background: #FAF9F6; --surface: #FFFFFF; --primary: #2F5233; --accent: #E8A33D; --ink: #1C2826; --border: #E2E8F0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--background); color: var(--ink); padding: 12px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .controls { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+    .control-group { flex: 1; min-width: 130px; }
+    label { font-size: 12px; font-weight: 700; color: var(--primary); display: block; margin-bottom: 4px; }
+    input[type=range] { width: 100%; accent-color: var(--primary); }
+    .readout { display: flex; justify-content: space-between; background: #F1F5F9; border-radius: 8px; padding: 8px 12px; font-family: monospace; font-size: 12px; font-weight: 700; margin-top: 10px; color: var(--primary); }
+    svg { width: 100%; height: 110px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="controls">
+      <div class="control-group">
+        <label>Force (F): <span id="fVal">10</span> N</label>
+        <input type="range" id="fRange" min="1" max="50" value="10">
+      </div>
+      <div class="control-group">
+        <label>Mass (m): <span id="mVal">5</span> kg</label>
+        <input type="range" id="mRange" min="1" max="20" value="5">
+      </div>
+    </div>
+    <svg id="simSvg" viewBox="0 0 400 110">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#E11D48"/>
+        </marker>
+      </defs>
+      <line x1="20" y1="85" x2="380" y2="85" stroke="#94A3B8" stroke-width="2" />
+      <rect id="box" x="40" y="45" width="40" height="40" rx="6" fill="#2F5233" />
+      <text id="boxText" x="60" y="69" fill="#FFFFFF" font-size="11" font-weight="bold" text-anchor="middle">5kg</text>
+      <line id="forceArrow" x1="80" y1="65" x2="130" y2="65" stroke="#E11D48" stroke-width="3" marker-end="url(#arrow)" />
+    </svg>
+    <div class="readout">
+      <span>Formula: a = F / m</span>
+      <span>Acceleration (a): <span id="aVal">2.00</span> m/s²</span>
+    </div>
+  </div>
+  <script>
+    const fRange = document.getElementById('fRange');
+    const mRange = document.getElementById('mRange');
+    const fVal = document.getElementById('fVal');
+    const mVal = document.getElementById('mVal');
+    const aVal = document.getElementById('aVal');
+    const boxText = document.getElementById('boxText');
+    const forceArrow = document.getElementById('forceArrow');
+
+    function update() {
+      const F = parseFloat(fRange.value);
+      const m = parseFloat(mRange.value);
+      const a = (F / m).toFixed(2);
+      fVal.textContent = F;
+      mVal.textContent = m;
+      aVal.textContent = a;
+      boxText.textContent = m + 'kg';
+      const arrowLen = Math.min(120, 20 + F * 2.0);
+      forceArrow.setAttribute('x2', 80 + arrowLen);
+    }
+    fRange.addEventListener('input', update);
+    mRange.addEventListener('input', update);
+    update();
+  </script>
+</body>
+</html>"""
+
+
+_MOCK_CHUNKS = [
+    {
+        "title": "Introduction & Fundamentals",
+        "explanation": "Imagine opening a new textbook for the first time. The material lays out foundational principles in clear, simple terms.",
+        "has_visual": False,
+        "visual_html": None,
+    },
+    {
+        "title": "Interactive STEM Simulation & Mechanics",
+        "explanation": "Newton's Second Law states that force equals mass times acceleration (F = m * a). Adjust the force and mass sliders below to see how acceleration updates live in real time.",
+        "has_visual": True,
+        "visual_html": _MOCK_PHYSICS_VISUAL,
+    },
+    {
+        "title": "Core Synthesis & Evaluation",
+        "explanation": "By understanding these building blocks, you can apply them to solve complex problems independently.",
+        "has_visual": False,
+        "visual_html": None,
+    },
+]
+
+
 async def fetch_video_title(video_id: str) -> str | None:
     try:
         embed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
