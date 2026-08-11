@@ -23,6 +23,8 @@ class MessageOut(BaseModel):
     id: uuid.UUID
     role: str
     content: str
+    visual_html: Optional[str] = None
+    visual_title: Optional[str] = None
     created_at: datetime
 
     class Config:

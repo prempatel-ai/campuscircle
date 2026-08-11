@@ -6,6 +6,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.database import Base
 
 
+from typing import Optional
+
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
@@ -15,6 +17,8 @@ class ChatMessage(Base):
     )
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    visual_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    visual_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

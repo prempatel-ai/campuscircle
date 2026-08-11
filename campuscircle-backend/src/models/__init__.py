@@ -21,6 +21,7 @@ from src.models.student_learning_profile import StudentLearningProfile
 from src.models.user_learning_memory import UserLearningMemory
 from src.models.lesson_chat_message import LessonChatMessage
 from src.models.weekly_learning_report import WeeklyLearningReport
+from src.models.reva_visual_cache import RevaVisualCache, RevaVisualRateLimit
 
 __all__ = [
     "University",
@@ -44,4 +45,6 @@ __all__ = [
     "UserLearningMemory",
     "LessonChatMessage",
     "WeeklyLearningReport",
+    "RevaVisualCache",
+    "RevaVisualRateLimit",
 ]

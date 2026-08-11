@@ -70,7 +70,8 @@ async def chat_with_reva(
     result = await generate_reva_chat_response(
         user_message=payload.message.strip(),
         conversation_history=history_dicts,
-        db=db
+        db=db,
+        user_id=uuid.UUID(current_user["user_id"]) if "user_id" in current_user else None
     )
 
     return RevaChatResponse(
@@ -212,7 +213,8 @@ async def send_message(
         user_message=payload.message,
         conversation_history=history_dicts,
         db=db,
-        user_university_id=uuid.UUID(current_user.get("university_id", "")),
+        user_id=user_uuid,
+        user_university_id=uuid.UUID(current_user.get("university_id", "")) if current_user.get("university_id") else None,
     )
 
     # Save AI response
@@ -220,6 +222,8 @@ async def send_message(
         conversation_id=conv_uuid,
         role="assistant",
         content=result["reply"],
+        visual_html=result.get("visual_html"),
+        visual_title=result.get("visual_title"),
     )
     db.add(reva_message)
 

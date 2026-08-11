@@ -8,6 +8,7 @@ import { apiRequest, ApiError } from "@/lib/api";
 import { AnonAvatar } from "@/components/AnonAvatar";
 import { useAuth } from "@/context/AuthContext";
 import { RevaChatSidebar } from "@/components/RevaChatSidebar";
+import { InteractiveVisual } from "@/components/InteractiveVisual";
 
 interface ConversationItem {
   id: string;
@@ -20,6 +21,8 @@ interface ApiMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  visual_html?: string | null;
+  visual_title?: string | null;
   created_at: string;
 }
 
@@ -27,6 +30,8 @@ interface ChatMessage {
   id: string;
   sender: "user" | "reva";
   text: string;
+  visual_html?: string | null;
+  visual_title?: string | null;
   timestamp: string;
 }
 
@@ -67,6 +72,8 @@ function toChatMessage(apiMsg: ApiMessage): ChatMessage {
     id: apiMsg.id,
     sender: apiMsg.role === "user" ? "user" : "reva",
     text: apiMsg.content,
+    visual_html: apiMsg.visual_html,
+    visual_title: apiMsg.visual_title,
     timestamp: formatTimestamp(apiMsg.created_at),
   };
 }
@@ -402,6 +409,14 @@ export default function AskRevaPage() {
                               >
                                 {msg.text}
                               </ReactMarkdown>
+                              {!isUser && msg.visual_html && (
+                                <div className="mt-3">
+                                  <InteractiveVisual
+                                    visualHtml={msg.visual_html}
+                                    title={msg.visual_title || "Interactive Visual Simulation"}
+                                  />
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
