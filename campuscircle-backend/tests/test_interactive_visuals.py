@@ -109,3 +109,60 @@ def test_quality_check_rejects_missing_css_tokens():
     from src.api.learn import validate_visual_quality_check
     no_tokens_html = "<html><body><input type='range' id='f'/><svg><rect width='10' height='10'/></svg><script>const f=document.getElementById('f'); f.addEventListener('input', update); function update(){}</script></body></html>"
     assert validate_visual_quality_check(no_tokens_html) is False
+
+
+def test_quiz_phase_out_and_submit_response_schema_attempt_fields():
+    from src.schemas.learn import QuizPhaseOut, QuizQuestionOut, QuizSubmitResponse
+
+    phase_out = QuizPhaseOut(
+        phase=1,
+        name="Recall",
+        description="Recall terms",
+        is_unlocked=True,
+        is_passed=False,
+        questions=[
+            QuizQuestionOut(
+                id="p1_q1",
+                question="Concept question in Hindi?",
+                options=["1", "2", "3", "4"],
+                chunk_id="chunk_0",
+                concept_category="Fundamentals"
+            )
+        ],
+        attempts_count=2,
+        max_attempts=3
+    )
+    assert phase_out.attempts_count == 2
+    assert phase_out.max_attempts == 3
+
+    submit_res = QuizSubmitResponse(
+        phase=1,
+        passed=False,
+        score_percent=50.0,
+        correct_count=5,
+        total_questions=10,
+        passing_threshold_percent=70.0,
+        next_phase_unlocked=None,
+        is_session_completed=False,
+        attempts_count=2,
+        max_attempts=3,
+        can_retry=True,
+        details=[]
+    )
+    assert submit_res.attempts_count == 2
+    assert submit_res.can_retry is True
+
+
+@pytest.mark.asyncio
+async def test_call_groq_api_for_single_phase_fallback():
+    from src.api.learn import call_groq_api_for_single_phase
+    phase_data = await call_groq_api_for_single_phase(
+        phase=1,
+        video_title="Archimedes Principle",
+        explanation_text="Buoyancy force equals weight of displaced fluid.",
+        language_name="Hindi (हिंदी)",
+        exclude_questions=["What is primary subject?"]
+    )
+    assert isinstance(phase_data, dict)
+    assert "questions" in phase_data
+    assert len(phase_data["questions"]) > 0

@@ -63,6 +63,8 @@ class QuizPhaseOut(BaseModel):
     is_unlocked: bool
     is_passed: bool
     questions: List[QuizQuestionOut]
+    attempts_count: int = 0
+    max_attempts: int = 3
 
 
 class QuizSessionOut(BaseModel):
@@ -101,6 +103,9 @@ class QuizSubmitResponse(BaseModel):
     passing_threshold_percent: float = 70.0
     next_phase_unlocked: Optional[int] = None
     is_session_completed: bool
+    attempts_count: int = 1
+    max_attempts: int = 3
+    can_retry: bool = True
     details: List[QuestionResultDetail]
     failed_chunk_ids: List[str] = Field(default_factory=list, description="Chunk/concept IDs needing remediation")
 

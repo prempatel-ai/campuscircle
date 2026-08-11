@@ -765,7 +765,7 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str, langua
 
     system_prompt = (
         "You are an expert AI assessment designer. Create a 3-phase multiple-choice quiz. "
-        f"You MUST write all questions, options, and explanations directly in {language_name}. "
+        f"MANDATORY LANGUAGE REQUIREMENT: You MUST write ALL questions ('question'), answer options ('options'), correct explanations ('explanation'), phase names ('name'), phase descriptions ('description'), and concept categories ('concept_category') directly in {language_name}. Do NOT output English if {language_name} is Hindi, Spanish, French, or Gujarati.\n\n"
         "Return JSON with top-level key 'phases' containing 'phase1', 'phase2', 'phase3'. "
         "Each phase has 'name', 'description', and 'questions' (list of exactly 10 questions). "
         "Each question MUST contain:\n"
@@ -783,7 +783,7 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str, langua
         "model": settings.groq_model,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Quiz in {language_name} for '{video_title}':\n\n{explanation_text[:12000]}"},
+            {"role": "user", "content": f"Create quiz directly in {language_name} for '{video_title}':\n\n{explanation_text[:12000]}"},
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.3,
@@ -800,6 +800,74 @@ async def call_groq_api_for_quiz(video_title: str, explanation_text: str, langua
                     return validated
 
     raise HTTPException(status_code=422, detail="Failed to generate a valid quiz. Please try again.")
+
+
+async def call_groq_api_for_single_phase(
+    phase: int,
+    video_title: str,
+    explanation_text: str,
+    language_name: str = "English",
+    exclude_questions: Optional[List[str]] = None
+) -> dict:
+    """
+    Generates a FRESH set of 10 multiple-choice questions for a specific retried phase in target language.
+    Guarantees questions do NOT duplicate previous failed attempt questions.
+    """
+    if not settings.groq_api_key:
+        phase_key = f"phase{phase}"
+        return _MOCK_QUIZ.get("phases", {}).get(phase_key, {})
+
+    exclude_prompt = ""
+    if exclude_questions and len(exclude_questions) > 0:
+        excluded_str = "; ".join(exclude_questions[:10])
+        exclude_prompt = f" Do NOT reuse or repeat any of these previously failed questions: [{excluded_str}]. Generate 10 COMPLETELY NEW, DIFFERENT questions."
+
+    phase_names = {1: "Recall", 2: "Application", 3: "Synthesis"}
+    phase_descs = {
+        1: "Test core memory of terms, definitions, and basic concepts.",
+        2: "Apply concepts to real-world scenarios, problems, and practical examples.",
+        3: "Synthesise ideas, evaluate trade-offs, and solve complex problems."
+    }
+
+    system_prompt = (
+        f"You are an expert AI assessment designer creating a retried Phase {phase} ({phase_names.get(phase, 'Quiz')}) multiple-choice quiz. "
+        f"MANDATORY LANGUAGE REQUIREMENT: You MUST write ALL question text ('question'), answer options ('options'), correct option explanations ('explanation'), phase name ('name'), phase description ('description'), and concept categories ('concept_category') directly in {language_name}. Do NOT output English if {language_name} is Hindi, Spanish, French, or Gujarati.{exclude_prompt}\n\n"
+        f"Return a JSON object with top-level keys: 'name' (string), 'description' (string), and 'questions' (list of exactly 10 questions).\n"
+        "Each question MUST contain:\n"
+        f"- 'id': string (e.g. p{phase}_q1 through p{phase}_q10)\n"
+        "- 'question': string\n"
+        "- 'options': list of 4 strings\n"
+        "- 'correct_index': integer (0-3)\n"
+        "- 'explanation': string explanation\n"
+        "- 'chunk_id': string (e.g. 'chunk_0', 'chunk_1', 'chunk_2')\n"
+        "- 'concept_category': string tag."
+    )
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
+    payload = {
+        "model": settings.groq_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Generate 10 FRESH Phase {phase} quiz questions in {language_name} for '{video_title}':\n\n{explanation_text[:12000]}"},
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.5,
+    }
+
+    async with httpx.AsyncClient(timeout=35.0) as client:
+        for _ in range(2):
+            res = await client.post(url, headers=headers, json=payload)
+            if res.status_code == 200:
+                content = res.json()["choices"][0]["message"]["content"]
+                parsed = json.loads(content) if isinstance(content, str) else content
+                if isinstance(parsed, dict) and isinstance(parsed.get("questions"), list) and len(parsed["questions"]) >= 5:
+                    return {
+                        "name": parsed.get("name", phase_names.get(phase, f"Phase {phase}")),
+                        "description": parsed.get("description", phase_descs.get(phase, "")),
+                        "questions": parsed["questions"]
+                    }
+
+    raise HTTPException(status_code=422, detail=f"Failed to generate fresh questions for Phase {phase}. Please try again.")
 
 
 async def call_groq_api_for_remediation(video_title: str, concept_title: str, original_explanation: str, language_name: str = "English") -> dict:
@@ -1151,6 +1219,8 @@ async def get_or_create_quiz(
         description=p1_raw.get("description", "Recall core terms"),
         is_unlocked=True, is_passed=bool(progress.get("phase1_passed")),
         questions=sanitize_phase_questions(p1_raw),
+        attempts_count=progress.get("phase1_attempts", 0),
+        max_attempts=3,
     )
     p2_out = QuizPhaseOut(
         phase=2, name=p2_raw.get("name", "Application"),
@@ -1158,6 +1228,8 @@ async def get_or_create_quiz(
         is_unlocked=bool(progress.get("phase1_passed")),
         is_passed=bool(progress.get("phase2_passed")),
         questions=sanitize_phase_questions(p2_raw) if progress.get("phase1_passed") else [],
+        attempts_count=progress.get("phase2_attempts", 0),
+        max_attempts=3,
     ) if progress.get("phase1_passed") else None
     p3_out = QuizPhaseOut(
         phase=3, name=p3_raw.get("name", "Synthesis"),
@@ -1165,6 +1237,8 @@ async def get_or_create_quiz(
         is_unlocked=bool(progress.get("phase2_passed")),
         is_passed=bool(progress.get("phase3_passed")),
         questions=sanitize_phase_questions(p3_raw) if progress.get("phase2_passed") else [],
+        attempts_count=progress.get("phase3_attempts", 0),
+        max_attempts=3,
     ) if progress.get("phase2_passed") else None
 
     return QuizSessionOut(
@@ -1174,6 +1248,73 @@ async def get_or_create_quiz(
         current_unlocked_phase=progress.get("current_phase", 1),
         is_completed=bool(progress.get("is_completed")),
         phase1=p1_out, phase2=p2_out, phase3=p3_out,
+    )
+
+
+@router.post("/{session_id}/quiz/{phase}/retry", response_model=QuizPhaseOut, status_code=200, summary="Generate fresh questions to retry a failed quiz phase")
+async def retry_quiz_phase(
+    session_id: str,
+    phase: int,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if phase not in [1, 2, 3]:
+        raise HTTPException(400, "Phase must be 1, 2, or 3.")
+    try:
+        session_uuid = uuid.UUID(session_id)
+        user_uuid = uuid.UUID(current_user["user_id"])
+    except ValueError:
+        raise HTTPException(404, "Learning session not found.")
+
+    res = await db.execute(
+        select(LearningSession).where(
+            LearningSession.id == session_uuid,
+            LearningSession.user_id == user_uuid
+        )
+    )
+    session = res.scalar_one_or_none()
+    if not session or not session.quiz_data:
+        raise HTTPException(404, "Quiz session not found.")
+
+    progress = session.user_progress or {}
+    current_attempts = progress.get(f"phase{phase}_attempts", 0)
+    if current_attempts >= 3:
+        raise HTTPException(400, "Maximum 3 attempts reached for this phase. Please review the explanation chunks before trying again.")
+
+    lang_name = SUPPORTED_LANGUAGES.get(session.language, "English")
+    explanation_text = " ".join(c["explanation"] for c in session.explanation_chunks.get("chunks", [])) if session.explanation_chunks else session.transcript
+
+    existing_questions = [
+        q["question"] for q in session.quiz_data.get("phases", {}).get(f"phase{phase}", {}).get("questions", [])
+        if isinstance(q, dict) and "question" in q
+    ]
+
+    fresh_phase_data = await call_groq_api_for_single_phase(
+        phase=phase,
+        video_title=session.video_title,
+        explanation_text=explanation_text,
+        language_name=lang_name,
+        exclude_questions=existing_questions
+    )
+
+    if "phases" not in session.quiz_data:
+        session.quiz_data["phases"] = {}
+    session.quiz_data["phases"][f"phase{phase}"] = fresh_phase_data
+    flag_modified(session, "quiz_data")
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+
+    phase_out_raw = session.quiz_data.get("phases", {}).get(f"phase{phase}", {})
+    return QuizPhaseOut(
+        phase=phase,
+        name=phase_out_raw.get("name", f"Phase {phase}"),
+        description=phase_out_raw.get("description", ""),
+        is_unlocked=True,
+        is_passed=bool(progress.get(f"phase{phase}_passed")),
+        questions=sanitize_phase_questions(phase_out_raw),
+        attempts_count=current_attempts,
+        max_attempts=3,
     )
 
 
@@ -1248,8 +1389,13 @@ async def submit_quiz_phase(
     passed = score >= 70.0
     next_unlocked = None
 
+    updated_progress = dict(progress)
+    current_attempts = updated_progress.get(f"phase{phase}_attempts", 0)
+    if not passed:
+        current_attempts += 1
+        updated_progress[f"phase{phase}_attempts"] = current_attempts
+
     if passed:
-        updated_progress = dict(progress)
         if phase == 1:
             updated_progress["phase1_passed"] = True
             updated_progress["current_phase"] = max(updated_progress.get("current_phase", 1), 2)
@@ -1261,10 +1407,10 @@ async def submit_quiz_phase(
         elif phase == 3:
             updated_progress["phase3_passed"] = True
             updated_progress["is_completed"] = True
-        
-        session.user_progress = updated_progress
-        flag_modified(session, "user_progress")
-        db.add(session)
+
+    session.user_progress = updated_progress
+    flag_modified(session, "user_progress")
+    db.add(session)
 
     await db.commit()
     await db.refresh(session)
@@ -1313,6 +1459,9 @@ async def submit_quiz_phase(
         correct_count=correct_count, total_questions=len(questions),
         passing_threshold_percent=70.0, next_phase_unlocked=next_unlocked,
         is_session_completed=bool(session.user_progress.get("is_completed")),
+        attempts_count=current_attempts,
+        max_attempts=3,
+        can_retry=(current_attempts < 3),
         details=details,
         failed_chunk_ids=list(failed_chunk_set)
     )

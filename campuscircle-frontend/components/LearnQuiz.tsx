@@ -19,6 +19,8 @@ interface PhaseData {
   is_unlocked: boolean;
   is_passed: boolean;
   questions: Question[];
+  attempts_count?: number;
+  max_attempts?: number;
 }
 
 interface QuizSession {
@@ -52,6 +54,9 @@ interface SubmitResult {
   passing_threshold_percent: number;
   next_phase_unlocked: number | null;
   is_session_completed: boolean;
+  attempts_count?: number;
+  max_attempts?: number;
+  can_retry?: boolean;
   details: QuestionDetail[];
   failed_chunk_ids?: string[];
 }
@@ -248,6 +253,51 @@ export function LearnQuiz({ sessionId, onBackToExplanation, onQuizComplete }: Le
       delete updated[activePhase];
       return updated;
     });
+  };
+
+  const [isRetryingPhase, setIsRetryingPhase] = useState<boolean>(false);
+
+  const handleRetryPhase = async (phaseNum: number) => {
+    setIsRetryingPhase(true);
+    setError(null);
+    try {
+      const updatedPhase = await apiRequest<PhaseData>(`/api/v1/learn/${sessionId}/quiz/${phaseNum}/retry`, {
+        method: "POST",
+      });
+
+      setQuizSession((prev) => {
+        if (!prev) return prev;
+        const phaseKey = `phase${phaseNum}` as keyof QuizSession;
+        return {
+          ...prev,
+          [phaseKey]: updatedPhase,
+        };
+      });
+
+      // Clear selected answers for this phase's questions
+      setSelectedAnswers((prev) => {
+        const next = { ...prev };
+        updatedPhase.questions.forEach((q) => {
+          delete next[q.id];
+        });
+        return next;
+      });
+
+      // Clear previous phase result so user can take fresh test
+      setPhaseResults((prev) => {
+        const next = { ...prev };
+        delete next[phaseNum];
+        return next;
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Failed to generate fresh questions for retry. Please try again.");
+      }
+    } finally {
+      setIsRetryingPhase(false);
+    }
   };
 
   if (isLoading) {
@@ -554,6 +604,49 @@ export function LearnQuiz({ sessionId, onBackToExplanation, onQuizComplete }: Le
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* PHASE RETRY BUTTON / MAX ATTEMPTS CAP BANNER */}
+              {!currentResult.passed && (
+                <div className="pt-3 border-t border-border-muted/40 space-y-3">
+                  {(currentResult.attempts_count || 1) < 3 ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-surface border border-red-200/80 rounded-xl p-4 shadow-2xs">
+                      <div className="space-y-0.5">
+                        <h5 className="font-display text-xs font-bold text-red-900">
+                          Retry Phase {activePhase} (Attempt {currentResult.attempts_count || 1} of 3)
+                        </h5>
+                        <p className="font-sans text-[11px] text-ink/70">
+                          Clicking retry will generate 10 fresh, different questions for Phase {activePhase}.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleRetryPhase(activePhase)}
+                        disabled={isRetryingPhase}
+                        className="px-5 py-2.5 bg-primary hover:bg-[#1F3E23] text-surface font-sans text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                      >
+                        {isRetryingPhase ? "Generating Fresh Questions..." : `Retry Phase ${activePhase}`}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-2 text-left">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span className="font-display text-xs font-bold text-amber-900">Maximum Attempts Reached (3 of 3)</span>
+                      </div>
+                      <p className="font-sans text-xs text-amber-900/80 leading-relaxed">
+                        You've reached the 3-attempt limit for Phase {activePhase}. We recommend reviewing the storytelling explanation chunks again to reinforce your understanding before retrying.
+                      </p>
+                      <button
+                        onClick={onBackToExplanation}
+                        className="mt-1 px-4 py-1.5 bg-primary text-surface font-sans text-xs font-bold rounded-lg hover:bg-primary/90 transition-colors cursor-pointer"
+                      >
+                        Review Explanation Chunks
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
