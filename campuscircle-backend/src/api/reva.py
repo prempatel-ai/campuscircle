@@ -222,9 +222,10 @@ async def send_message(
         conversation_id=conv_uuid,
         role="assistant",
         content=result["reply"],
-        visual_html=result.get("visual_html"),
-        visual_title=result.get("visual_title"),
     )
+    if hasattr(reva_message, "visual_html"):
+        setattr(reva_message, "visual_html", result.get("visual_html"))
+        setattr(reva_message, "visual_title", result.get("visual_title"))
     db.add(reva_message)
 
     # Update title if title is currently default or empty
