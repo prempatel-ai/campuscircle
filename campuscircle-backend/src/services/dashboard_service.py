@@ -21,25 +21,29 @@ from src.services.learning_profile_service import get_or_create_learning_profile
 def infer_subject_category(topic_title: str) -> str:
     """Dynamically infer subject category from topic title keywords."""
     if not topic_title:
-        return "Computer Science"
+        return "General STEM"
     t = topic_title.lower()
-    if any(k in t for k in ["python", "django", "flask", "numpy", "pandas", "pytorch", "script"]):
-        return "Python"
-    if any(k in t for k in ["dbms", "sql", "database", "postgres", "query", "normalization", "relational", "nosql"]):
-        return "DBMS"
-    if any(k in t for k in ["os", "operating system", "process", "thread", "kernel", "deadlock", "memory management"]):
-        return "Operating System"
-    if any(k in t for k in ["network", "tcp", "udp", "ip", "http", "socket", "dns", "router"]):
-        return "Computer Networks"
-    if any(k in t for k in ["algorithm", "data structure", "tree", "graph", "sorting", "binary search", "recursion", "dynamic programming"]):
-        return "Data Structures & Algorithms"
-    if any(k in t for k in ["ai", "ml", "machine learning", "deep learning", "neural", "llm", "rag", "transformer"]):
-        return "Artificial Intelligence"
-    if any(k in t for k in ["java", "c++", "c#", "rust", "go", "javascript", "typescript", "html", "css"]):
-        return "Programming & Development"
-    if any(k in t for k in ["system design", "distributed", "scalability", "load balancing", "microservices"]):
-        return "System Design"
-    return "Computer Science"
+    
+    # Mathematics
+    if any(k in t for k in ["calculus", "algebra", "differential", "statistics", "probability", "theorem", "integral", "derivative"]):
+        return "Mathematics"
+    # Physics
+    if any(k in t for k in ["quantum", "mechanics", "thermodynamics", "physics", "relativity", "kinematics", "electromagnetism", "optics"]):
+        return "Physics"
+    # Chemistry
+    if any(k in t for k in ["organic", "chemistry", "reaction", "molecule", "synthesis", "bonding", "stoichiometry"]):
+        return "Chemistry"
+    # Life Sciences / Biology
+    if any(k in t for k in ["anatomy", "genetics", "cell", "biology", "medical", "physiology", "evolution", "ecology"]):
+        return "Life Sciences & Medicine"
+    # Engineering
+    if any(k in t for k in ["circuit", "thermo", "fluid", "materials", "engineering", "statics", "dynamics", "cad"]):
+        return "Engineering"
+    # Computer Science
+    if any(k in t for k in ["algorithm", "python", "javascript", "system design", "machine learning", "database", "os", "network"]):
+        return "Computer Science"
+        
+    return "General STEM"
 
 
 async def get_learning_dashboard(

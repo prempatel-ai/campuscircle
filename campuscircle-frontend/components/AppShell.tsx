@@ -80,7 +80,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           {/* Logo & Main Nav */}
           <div className="flex items-center gap-4 sm:gap-6">
             <Link
-              href="/feed"
+              href={user?.university_id ? "/feed" : "/learn"}
               className="flex items-center gap-2 hover:opacity-90 transition-opacity shrink-0"
             >
               <span className="font-display text-xl sm:text-2xl font-bold tracking-tight text-primary">
@@ -89,19 +89,21 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             </Link>
 
             <nav className="hidden md:flex items-center gap-2">
-              <Link
-                href="/feed"
-                className={`px-3.5 py-1.5 rounded-full text-xs font-sans transition-all flex items-center gap-1.5 ${
-                  pathname.startsWith("/feed")
-                    ? "bg-primary/10 text-primary font-bold shadow-2xs"
-                    : "text-ink/75 hover:bg-surface-subtle hover:text-ink font-semibold"
-                }`}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                </svg>
-                <span>Feed</span>
-              </Link>
+              {user?.university_id && (
+                <Link
+                  href="/feed"
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-sans transition-all flex items-center gap-1.5 ${
+                    pathname.startsWith("/feed")
+                      ? "bg-primary/10 text-primary font-bold shadow-2xs"
+                      : "text-ink/75 hover:bg-surface-subtle hover:text-ink font-semibold"
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                  </svg>
+                  <span>Feed</span>
+                </Link>
+              )}
               <Link
                 href="/learn"
                 className={`px-3.5 py-1.5 rounded-full text-xs font-sans transition-all flex items-center gap-1.5 ${
@@ -206,17 +208,19 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
                   {/* Navigation Links */}
                   <div className="py-1">
-                    <Link
-                      href="/feed"
-                      role="menuitem"
-                      onClick={() => setIsMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                      </svg>
-                      Community Feed
-                    </Link>
+                    {user?.university_id && (
+                      <Link
+                        href="/feed"
+                        role="menuitem"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-sans font-semibold text-ink/80 hover:bg-background hover:text-primary transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                        </svg>
+                        Community Feed
+                      </Link>
+                    )}
                     <Link
                       href="/learn"
                       role="menuitem"
@@ -329,19 +333,21 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
       {/* Persistent Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-surface/95 backdrop-blur-md border-t border-border-muted/80 px-2 py-1 flex items-center justify-around shadow-lg">
-        <Link
-          href="/feed"
-          className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 min-h-[44px] text-[11px] font-sans transition-all border-t-2 ${
-            pathname.startsWith("/feed")
-              ? "text-primary font-extrabold border-primary -mt-[2px]"
-              : "text-ink/75 font-semibold border-transparent hover:text-ink"
-          }`}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-          </svg>
-          <span>Feed</span>
-        </Link>
+        {user?.university_id && (
+          <Link
+            href="/feed"
+            className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 min-h-[44px] text-[11px] font-sans transition-all border-t-2 ${
+              pathname.startsWith("/feed")
+                ? "text-primary font-extrabold border-primary -mt-[2px]"
+                : "text-ink/75 font-semibold border-transparent hover:text-ink"
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+            </svg>
+            <span>Feed</span>
+          </Link>
+        )}
 
         <Link
           href="/learn"

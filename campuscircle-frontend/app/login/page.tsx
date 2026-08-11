@@ -3,24 +3,28 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, decodeJwt } from "@/context/AuthContext";
 import { apiRequest, ApiError } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, login, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // If already authenticated, redirect directly to feed page
+  // If already authenticated, redirect directly
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      router.push("/feed");
+    if (!authLoading && isAuthenticated && user) {
+      if (user.university_id && user.university_id !== "None") {
+        router.push("/feed");
+      } else {
+        router.push("/learn");
+      }
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, authLoading, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +46,13 @@ export default function LoginPage() {
 
       // Login using AuthContext which handles token storage and state updates
       login(response.access_token, response.refresh_token);
-      router.push("/feed");
+      
+      const decoded = decodeJwt(response.access_token);
+      if (decoded && decoded.university_id && decoded.university_id !== "None") {
+        router.push("/feed");
+      } else {
+        router.push("/learn");
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

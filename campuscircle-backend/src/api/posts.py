@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from src.database import get_db
-from src.auth.dependencies import get_current_user
+from src.auth.dependencies import require_university_student
 from src.models.user import User
 from src.models.community import Community
 from src.models.post import Post
@@ -37,7 +37,7 @@ async def search_university_posts_endpoint(
     community_id: str | None = Query(None, description="Optional community filter"),
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(20, ge=1, le=100, description="Page size"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     uni_uuid = uuid.UUID(current_user["university_id"])
@@ -88,7 +88,7 @@ async def search_university_posts_endpoint(
 async def create_new_post(
     community_id: str,
     payload: PostCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     user_id_str = current_user["user_id"]
@@ -176,7 +176,7 @@ async def create_new_post(
 async def create_new_thread(
     community_id: str,
     payload: ThreadCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     user_id_str = current_user["user_id"]
@@ -293,7 +293,7 @@ async def list_community_posts(
     tag: str | None = Query(None, description="Filter posts by hashtag"),
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(20, ge=1, le=100, description="Page size"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     uni_uuid = uuid.UUID(current_user["university_id"])
@@ -363,7 +363,7 @@ async def search_community_posts(
     q: str = Query(..., description="Search query string"),
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(20, ge=1, le=100, description="Page size"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     if not q or not q.strip():
@@ -434,7 +434,7 @@ async def search_community_posts(
 )
 async def get_single_post(
     post_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     uni_uuid = uuid.UUID(current_user["university_id"])
@@ -489,7 +489,7 @@ async def get_single_post(
 )
 async def get_post_thread(
     post_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     uni_uuid = uuid.UUID(current_user["university_id"])
@@ -551,7 +551,7 @@ async def get_post_thread(
 )
 async def get_post_comments(
     post_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     uni_uuid = uuid.UUID(current_user["university_id"])
@@ -597,7 +597,7 @@ async def get_post_comments(
 async def create_new_comment(
     post_id: str,
     payload: CommentCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     user_id_str = current_user["user_id"]
@@ -690,7 +690,7 @@ async def create_new_comment(
 )
 async def toggle_post_bookmark(
     post_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     user_id_str = current_user["user_id"]
@@ -736,7 +736,7 @@ async def toggle_post_bookmark(
 )
 async def save_post_endpoint(
     post_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     return await toggle_post_bookmark(post_id=post_id, current_user=current_user, db=db)
@@ -749,7 +749,7 @@ async def save_post_endpoint(
 )
 async def unsave_post_endpoint(
     post_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     user_id_str = current_user["user_id"]

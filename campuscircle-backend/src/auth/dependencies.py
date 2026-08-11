@@ -39,6 +39,20 @@ async def get_current_user(
         )
 
 
+async def require_university_student(current_user: dict = Depends(get_current_user)) -> dict:
+    """
+    FastAPI dependency to enforce that the logged-in user belongs to a university.
+    Raises 403 Forbidden if the user's university_id is None.
+    """
+    uni_id = current_user.get("university_id")
+    if not uni_id or uni_id == "None":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A verified university email is required to access this community feature."
+        )
+    return current_user
+
+
 async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     """
     FastAPI dependency to enforce that the logged-in user has the "admin" role.

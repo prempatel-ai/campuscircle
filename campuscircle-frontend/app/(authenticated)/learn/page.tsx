@@ -8,6 +8,7 @@ import { LessonChat } from "@/components/LessonChat";
 import { LearningDashboard, type DashboardData } from "@/components/LearningDashboard";
 import { LearningReports } from "@/components/LearningReports";
 import { apiRequest, ApiError } from "@/lib/api";
+import { STEM_CATEGORIES } from "@/lib/stem-topics";
 
 interface Chunk {
   title: string;
@@ -54,97 +55,7 @@ interface PreSessionMentor {
   streak_days: number;
 }
 
-const CAREER_GOALS = [
-  { id: "Placement Preparation", label: "Placement Preparation", iconType: "briefcase", desc: "Coding interviews, DS/Algo, time complexity" },
-  { id: "AI / Machine Learning", label: "AI / Machine Learning", iconType: "cpu", desc: "ML models, neural nets, math, vector spaces" },
-  { id: "Data Science", label: "Data Science", iconType: "chart", desc: "Data analysis, SQL, statistics, visualization" },
-  { id: "Web Development", label: "Web Development", iconType: "globe", desc: "Frontend, backend, APIs, system architecture" },
-  { id: "Mobile Development", label: "Mobile Development", iconType: "phone", desc: "iOS, Android, cross-platform apps, UI/UX" },
-  { id: "Competitive Programming", label: "Competitive Programming", iconType: "zap", desc: "Fast problem solving, edge cases, algorithms" },
-  { id: "GATE", label: "GATE Exam", iconType: "academic", desc: "Core CS theory, formulas, exam problems" },
-  { id: "Research", label: "Academic Research", iconType: "beaker", desc: "Papers, deep theory, mathematical proofs" },
-  { id: "Other", label: "General Learning", iconType: "compass", desc: "Comprehensive foundational understanding" },
-];
 
-function renderGoalIcon(type: string) {
-  const className = "w-5 h-5 text-primary shrink-0 mt-0.5";
-  switch (type) {
-    case "briefcase":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-      );
-    case "cpu":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M3 9h2m-2 6h2m14-6h2m-2 6h2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-        </svg>
-      );
-    case "chart":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      );
-    case "globe":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 014 9 15.3 15.3 0 01-4 9 15.3 15.3 0 01-4-9 15.3 15.3 0 014-9z" />
-        </svg>
-      );
-    case "phone":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-        </svg>
-      );
-    case "zap":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      );
-    case "academic":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-        </svg>
-      );
-    case "beaker":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L5.605 15.12a2 2 0 00-1.8 1.18l-1.2 2.7A2 2 0 004.414 21.8h15.172a2 2 0 001.809-2.8l-1.967-3.572z" />
-        </svg>
-      );
-    default:
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-        </svg>
-      );
-  }
-}
-
-const SAMPLE_VIDEOS = [
-  {
-    title: "Python in 100 Seconds",
-    url: "https://www.youtube.com/watch?v=x7X9w_GIm1s",
-  },
-  {
-    title: "Docker Containers Overview",
-    url: "https://www.youtube.com/watch?v=Gjnup-PuquQ",
-  },
-  {
-    title: "FastAPI Backend Crash Course",
-    url: "https://www.youtube.com/watch?v=0sOvCWFmrtA",
-  },
-  {
-    title: "SQL & Databases Explained",
-    url: "https://www.youtube.com/watch?v=zsjvFFKOm3c",
-  },
-];
 
 const LANGUAGES = [
   { code: "en", label: "English", tag: "EN" },
@@ -160,10 +71,28 @@ export default function LearnPage() {
   const [pastedText, setPastedText] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("en");
 
+  const [selectedMainField, setSelectedMainField] = useState<string>("Computer Science");
+  const [selectedSubField, setSelectedSubField] = useState<string>("Web Development");
+  const [randomizedVideos, setRandomizedVideos] = useState<{title: string, url: string}[]>([]);
+
+  useEffect(() => {
+    if (selectedMainField && selectedSubField && STEM_CATEGORIES[selectedMainField]?.[selectedSubField]) {
+      const videos = [...STEM_CATEGORIES[selectedMainField][selectedSubField]];
+      for (let i = videos.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [videos[i], videos[j]] = [videos[j], videos[i]];
+      }
+      setRandomizedVideos(videos.slice(0, 6)); // show up to 6 shuffled videos
+    } else {
+      setRandomizedVideos([]);
+    }
+  }, [selectedMainField, selectedSubField]);
+
   const [userGaps, setUserGaps] = useState<ConceptGap[]>([]);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [mentorGuidance, setMentorGuidance] = useState<PreSessionMentor | null>(null);
   const [showGoalModal, setShowGoalModal] = useState<boolean>(false);
+  const [onboardingMainField, setOnboardingMainField] = useState<string | null>(null);
   const [isSavingGoal, setIsSavingGoal] = useState<boolean>(false);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
@@ -539,26 +468,74 @@ export default function LearnPage() {
             )}
 
             {/* Sample Topics */}
-            <div className="pt-2 border-t border-border-muted/60 space-y-2">
+            <div className="pt-2 border-t border-border-muted/60 space-y-4">
               <span className="text-[11px] font-mono text-ink/50 uppercase font-bold">
                 Try a sample topic:
               </span>
+              
+              {/* Main Field Selector */}
               <div className="flex flex-wrap gap-2">
-                {SAMPLE_VIDEOS.map((sample, idx) => (
+                {Object.keys(STEM_CATEGORIES).map((mainField) => (
                   <button
-                    key={idx}
+                    key={mainField}
                     type="button"
                     onClick={() => {
-                      setInputMode("url");
-                      setYoutubeUrl(sample.url);
-                      handleExtractAndExplain(sample.url);
+                      setSelectedMainField(mainField);
+                      setSelectedSubField(Object.keys(STEM_CATEGORIES[mainField])[0]);
                     }}
-                    className="px-3 py-1.5 bg-background hover:bg-surface border border-border-muted rounded-lg text-xs font-sans text-ink/80 hover:text-primary transition-all cursor-pointer"
+                    className={`px-3 py-1.5 rounded-lg text-xs font-sans font-bold border transition-all cursor-pointer ${
+                      selectedMainField === mainField
+                        ? "bg-primary text-surface border-primary shadow-xs"
+                        : "bg-surface border-border-muted text-ink/70 hover:border-primary/50"
+                    }`}
                   >
-                    {sample.title}
+                    {mainField}
                   </button>
                 ))}
               </div>
+              
+              {/* Sub Field Selector */}
+              {selectedMainField && STEM_CATEGORIES[selectedMainField] && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-border-muted/30">
+                  {Object.keys(STEM_CATEGORIES[selectedMainField]).map((subField) => (
+                    <button
+                      key={subField}
+                      type="button"
+                      onClick={() => setSelectedSubField(subField)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-sans font-bold border transition-all cursor-pointer ${
+                        selectedSubField === subField
+                          ? "bg-primary/10 text-primary border-primary ring-1 ring-primary/20 shadow-xs"
+                          : "bg-background border-border-muted text-ink/70 hover:border-border-muted/80"
+                      }`}
+                    >
+                      {subField}
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {/* Videos */}
+              {randomizedVideos.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {randomizedVideos.map((sample, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setInputMode("url");
+                        setYoutubeUrl(sample.url);
+                        handleExtractAndExplain(sample.url);
+                      }}
+                      className="px-3 py-1.5 bg-background hover:bg-surface border border-border-muted rounded-lg text-xs font-sans text-ink/80 hover:text-primary transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <svg className="w-3 h-3 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+                      </svg>
+                      {sample.title}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -687,29 +664,59 @@ export default function LearnPage() {
             </div>
 
             <div className="px-6 sm:px-8 py-5 flex-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {CAREER_GOALS.map((goal) => {
-                const isSelected = profile?.career_goal === goal.id;
-                return (
-                  <button
-                    key={goal.id}
-                    disabled={isSavingGoal}
-                    onClick={() => handleSelectCareerGoal(goal.id)}
-                    className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
-                      isSelected
-                        ? "bg-primary/10 border-primary text-primary shadow-xs ring-1 ring-primary/30"
-                        : "bg-background border-border-muted/80 text-ink hover:border-primary/50 hover:bg-surface"
-                    }`}
-                  >
-                    {renderGoalIcon(goal.iconType)}
-                    <div className="space-y-0.5 min-w-0">
-                      <p className="font-sans text-xs font-bold truncate">{goal.label}</p>
-                      <p className="font-sans text-[11px] text-ink/60 leading-snug line-clamp-2">{goal.desc}</p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+              {!onboardingMainField ? (
+                <div className="space-y-3">
+                  <p className="text-xs font-mono font-bold text-ink/50 uppercase">Step 1: Choose a Field</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {Object.keys(STEM_CATEGORIES).map((mainField) => (
+                      <button
+                        key={mainField}
+                        type="button"
+                        onClick={() => setOnboardingMainField(mainField)}
+                        className="p-4 rounded-2xl border bg-background border-border-muted/80 text-left transition-all cursor-pointer hover:border-primary/50 hover:bg-surface flex items-center justify-between"
+                      >
+                        <span className="font-sans text-sm font-bold text-ink/80">{mainField}</span>
+                        <svg className="w-4 h-4 text-ink/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-200">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-mono font-bold text-ink/50 uppercase">Step 2: Choose a Sub-Field</p>
+                    <button
+                      type="button"
+                      onClick={() => setOnboardingMainField(null)}
+                      className="text-xs font-sans font-bold text-primary hover:underline cursor-pointer"
+                    >
+                      ← Back to Fields
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {Object.keys(STEM_CATEGORIES[onboardingMainField]).map((subField) => {
+                      const isSelected = profile?.career_goal === subField;
+                      return (
+                        <button
+                          key={subField}
+                          type="button"
+                          disabled={isSavingGoal}
+                          onClick={() => handleSelectCareerGoal(subField)}
+                          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
+                            isSelected
+                              ? "bg-primary/10 border-primary text-primary shadow-xs ring-1 ring-primary/30"
+                              : "bg-background border-border-muted/80 text-ink hover:border-primary/50 hover:bg-surface"
+                          }`}
+                        >
+                          <span className="font-sans text-sm font-bold truncate">{subField}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sticky footer */}

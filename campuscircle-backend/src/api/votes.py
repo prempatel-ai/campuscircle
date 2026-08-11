@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from src.database import get_db
-from src.auth.dependencies import get_current_user
+from src.auth.dependencies import require_university_student
 from src.models.user import User
 from src.schemas.vote import VotePayload, VoteResult
 from src.repositories.vote_repository import cast_vote
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/votes", tags=["votes"])
 )
 async def cast_or_toggle_vote(
     payload: VotePayload,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_university_student),
     db: AsyncSession = Depends(get_db)
 ):
     user_id_str = current_user["user_id"]

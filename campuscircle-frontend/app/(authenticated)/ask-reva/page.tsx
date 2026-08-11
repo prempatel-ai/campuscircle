@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Lightbulb, FileText, Code, Target } from "lucide-react";
+import { Lightbulb, FileText, Code, BrainCircuit } from "lucide-react";
 import { apiRequest, ApiError } from "@/lib/api";
 import { AnonAvatar } from "@/components/AnonAvatar";
 import { useAuth } from "@/context/AuthContext";
@@ -57,8 +57,8 @@ const STARTER_PROMPTS = [
   {
     title: "Personalized Study Plan",
     desc: "Build a structured roadmap for upcoming exams or career goals",
-    icon: Target,
-    prompt: "Create a 7-day study plan to master Data Structures & Algorithms before exams.",
+    icon: BrainCircuit,
+    prompt: "Create a 7-day study plan to master Calculus before exams.",
   },
 ];
 

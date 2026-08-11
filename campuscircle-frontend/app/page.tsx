@@ -10,15 +10,19 @@ import { LandingHowItWorks } from "@/components/LandingHowItWorks";
 
 export default function Home() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [thesisVisible, setThesisVisible] = useState(true);
   const thesisRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.push("/feed");
+    if (!isLoading && isAuthenticated && user) {
+      if (user.university_id && user.university_id !== "None") {
+        router.push("/feed");
+      } else {
+        router.push("/learn");
+      }
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, user, router]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(

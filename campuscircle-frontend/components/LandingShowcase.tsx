@@ -85,7 +85,7 @@ export const LandingShowcase: React.FC = () => {
                 : "bg-surface border border-border-muted text-ink/70 hover:border-primary/40 hover:text-primary"
             }`}
           >
-            # Computer Science
+            # Biochemistry
           </button>
           <button
             onClick={() => setActiveTab("housing")}
@@ -136,7 +136,7 @@ export const LandingShowcase: React.FC = () => {
                   ▲ 42
                 </span>
                 <span>18 comments</span>
-                <span className="ml-auto text-[11px] font-mono text-ink/40"># Computer Science</span>
+                <span className="ml-auto text-[11px] font-mono text-ink/40"># Engineering</span>
               </div>
             </div>
           ) : null}
