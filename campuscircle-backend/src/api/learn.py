@@ -178,26 +178,53 @@ _MOCK_PHYSICS_VISUAL = """<!DOCTYPE html>
 </html>"""
 
 
-_MOCK_CHUNKS = [
-    {
-        "title": "Introduction & Fundamentals",
-        "explanation": "Imagine opening a new textbook for the first time. The material lays out foundational principles in clear, simple terms.",
-        "has_visual": False,
-        "visual_html": None,
-    },
-    {
-        "title": "Interactive STEM Simulation & Mechanics",
-        "explanation": "Newton's Second Law states that force equals mass times acceleration (F = m * a). Adjust the force and mass sliders below to see how acceleration updates live in real time.",
-        "has_visual": True,
-        "visual_html": _MOCK_PHYSICS_VISUAL,
-    },
-    {
-        "title": "Core Synthesis & Evaluation",
-        "explanation": "By understanding these building blocks, you can apply them to solve complex problems independently.",
-        "has_visual": False,
-        "visual_html": None,
-    },
-]
+def get_mock_chunks(language_name: str = "English") -> List[dict]:
+    lang_lower = str(language_name).lower()
+    if "gujarati" in lang_lower or "ગુજરાતી" in lang_lower:
+        t1, e1 = "મૂળભૂત વિભાવનાઓ અને પરિચય", "આ પાઠમાં તમે મુખ્ય સિદ્ધાંતો અને વિભાવનાઓ સરળ રીતે શીખશો."
+        t2, e2 = "ઇન્ટરેક્ટિવ STEM સિમ્યુલેશન", "ન્યૂટનનો બીજો નિયમ દર્શાવે છે કે બળ એ દ્રવ્યમાન અને પ્રવેગના ગુણાકાર જેટલું છે (F = m * a). નીચે આપેલા સ્લાઇડર્સ એડજસ્ટ કરો."
+        t3, e3 = "મુખ્ય સરાંશ અને મૂલ્યાંકન", "આ વિભાવનાઓ સમજીને તમે જટિલ સમસ્યાઓ જાતે ઉકેલી શકો છો."
+    elif "hindi" in lang_lower or "हिंदी" in lang_lower:
+        t1, e1 = "मूल अवधारणाएं और परिचय", "इस पाठ में आप मुख्य सिद्धांतों और अवधारणाओं को सरल भाषा में समझेंगे।"
+        t2, e2 = "इंटरएक्टिव STEM सिमुलेशन", "न्यूटन का दूसरा नियम बताता है कि बल द्रव्यमान और त्वरण के गुणनफल के बराबर होता है (F = m * a)। नीचे दिए गए स्लाइडर्स समायोजित करें।"
+        t3, e3 = "मुख्य सारांश और मूल्यांकन", "इन अवधारणाओं को समझकर आप जटिल समस्याओं को स्वयं हल कर सकते हैं।"
+    elif "spanish" in lang_lower or "español" in lang_lower:
+        t1, e1 = "Introducción y Conceptos Fundamentales", "En esta lección aprenderás los principios básicos explicados de manera clara y sencilla."
+        t2, e2 = "Simulación STEM Interactiva", "La segunda ley de Newton establece que la fuerza es igual a la masa por la aceleración (F = m * a). Ajusta los deslizadores."
+        t3, e3 = "Síntesis y Evaluación", "Al comprender estos conceptos básicos, podrás resolver problemas complejos de forma independiente."
+    elif "french" in lang_lower or "français" in lang_lower:
+        t1, e1 = "Introduction et Concepts Fondamentaux", "Dans cette leçon, vous apprendrez les principes de base expliqués de manière claire et simple."
+        t2, e2 = "Simulation STEM Interactive", "La deuxième loi de Newton stipule que la force est égale à la masse multipliée par l'accélération (F = m * a). Ajustez les curseurs."
+        t3, e3 = "Synthèse et Évaluation", "En comprenant ces concepts de base, vous pourrez résoudre des problèmes complexes de manière indépendante."
+    else:
+        t1, e1 = "Introduction & Fundamentals", "Imagine opening a new textbook for the first time. The material lays out foundational principles in clear, simple terms."
+        t2, e2 = "Interactive STEM Simulation & Mechanics", "Newton's Second Law states that force equals mass times acceleration (F = m * a). Adjust the force and mass sliders below to see how acceleration updates live in real time."
+        t3, e3 = "Core Synthesis & Evaluation", "By understanding these building blocks, you can apply them to solve complex problems independently."
+
+    return [
+        {"title": t1, "explanation": e1, "has_visual": False, "visual_html": None},
+        {"title": t2, "explanation": e2, "has_visual": True, "visual_html": _MOCK_PHYSICS_VISUAL},
+        {"title": t3, "explanation": e3, "has_visual": False, "visual_html": None},
+    ]
+
+
+_MOCK_CHUNKS = get_mock_chunks("English")
+
+
+def is_explanation_in_wrong_language(chunks: List[dict], target_lang_code: str) -> bool:
+    if not chunks or target_lang_code == "en":
+        return False
+    first_exp = str(chunks[0].get("explanation", "")).strip()
+
+    if target_lang_code in ["gu", "hi"]:
+        has_indic = any(ord(c) >= 0x0900 for c in first_exp)
+        if not has_indic:
+            return True
+
+    if "Imagine opening a new textbook" in first_exp or "foundational principles in clear" in first_exp:
+        return True
+
+    return False
 
 
 async def fetch_video_title(video_id: str) -> str | None:
@@ -768,7 +795,7 @@ async def call_groq_api_for_explanation(
 ) -> List[dict]:
     api_key = get_groq_api_key("explanation")
     if not api_key:
-        return _MOCK_CHUNKS
+        return get_mock_chunks(language_name)
 
     goal_prompt = (
         f" The student's primary career goal is '{career_goal}'. Where relevant and natural, "
@@ -789,7 +816,7 @@ async def call_groq_api_for_explanation(
     system_prompt = (
         "You are an expert AI educator. Break down the provided video transcript into "
         "digestible, storytelling-style explanation chunks for a first-time learner. "
-        f"You MUST write all titles and explanations directly in {language_name}.{goal_prompt}{memory_prompt}\n\n"
+        f"MANDATORY LANGUAGE REQUIREMENT: You MUST write ALL titles ('title') and explanations ('explanation') directly in {language_name}. Do NOT output English if {language_name} is Hindi, Spanish, French, or Gujarati.{goal_prompt}{memory_prompt}\n\n"
         "FOR EACH CHUNK, EVALUATE VISUAL SUITABILITY:\n"
         "- Decide if an interactive visual simulation (HTML + inline SVG + vanilla JS with controls like sliders or buttons driving live readouts and animated SVG diagram attributes) WOULD MEANINGFULLY HELP teach this specific concept.\n"
         "- ONLY generate a visual for STEM, physics, math, engineering, algorithms, or data structure concepts where an interactive visual genuinely aids understanding (e.g. force + mass sliders driving a live acceleration readout and animated SVG box, or interactive step visualizer).\n"
@@ -878,8 +905,8 @@ async def call_groq_api_for_explanation(
     if last_valid_parsed:
         return last_valid_parsed
 
-    logger.warning("[GROQ EXPLANATION EXHAUSTED] Returning storytelling fallback chunks.")
-    return _MOCK_CHUNKS
+    logger.warning(f"[GROQ EXPLANATION EXHAUSTED] Returning storytelling fallback chunks in {language_name}.")
+    return get_mock_chunks(language_name)
 
 def get_mock_quiz(language_name: str = "English") -> dict:
     lang_lower = str(language_name).lower()
@@ -1263,25 +1290,26 @@ async def explain_youtube_transcript(
     )).scalar_one() or 0
 
     if cached_session:
-        await update_profile_on_explanation(db=db, user_id=user_uuid, language=cached_session.language)
         raw_chunks = cached_session.explanation_chunks.get("chunks", [])
-        return ExplainResponse(
-            session_id=str(cached_session.id),
-            video_id=video_id,
-            video_title=cached_session.video_title,
-            language=cached_session.language,
-            chunks=[
-                ExplanationChunk(
-                    title=c["title"],
-                    explanation=c["explanation"],
-                    has_visual=bool(c.get("has_visual", False)),
-                    visual_html=c.get("visual_html"),
-                )
-                for c in raw_chunks
-            ],
-            is_cached=True,
-            daily_explanations_remaining=max(0, EXPLAIN_DAILY_LIMIT - daily_count),
-        )
+        if not is_explanation_in_wrong_language(raw_chunks, target_lang):
+            await update_profile_on_explanation(db=db, user_id=user_uuid, language=cached_session.language)
+            return ExplainResponse(
+                session_id=str(cached_session.id),
+                video_id=video_id,
+                video_title=cached_session.video_title,
+                language=cached_session.language,
+                chunks=[
+                    ExplanationChunk(
+                        title=c["title"],
+                        explanation=c["explanation"],
+                        has_visual=bool(c.get("has_visual", False)),
+                        visual_html=c.get("visual_html"),
+                    )
+                    for c in raw_chunks
+                ],
+                is_cached=True,
+                daily_explanations_remaining=max(0, EXPLAIN_DAILY_LIMIT - daily_count),
+            )
 
     if daily_count >= EXPLAIN_DAILY_LIMIT:
         raise HTTPException(429, f"Daily explanation limit of {EXPLAIN_DAILY_LIMIT} reached.")
