@@ -237,6 +237,18 @@ pytest tests/test_reva_visuals.py tests/test_interactive_visuals.py
 
 ---
 
+### 7. Interactive Simulation Hub (Beta)
+- **Dedicated Physics & Economy Sandboxes**: A centralized `/simulate` hub hosting 4 premium interactive engines: ChipTycoon (Logic Gates/IoT), EngineWorks (Thermodynamics), Rocket Propulsion (Orbital Mechanics), and Token Town (Macroeconomics).
+- **Zero-Friction Loading**: Hosted natively alongside the Next.js app as static assets for instant loading and 100% sandboxed execution.
+- **Pedagogical Impact**: Allows students to instantly transition from theoretical text-based learning in the Reva chat to hands-on, sandbox experimentation. This cements complex STEM concepts through trial-and-error visual simulation.
+
+### 8. Native Multilingual Voice Engine & Localization
+- **High-Quality Native Synthesis**: Re-engineered TTS engine that eager-caches local operating system voices to ensure Hindi and Gujarati explanations use authentic, native accents (`hi-IN`, `gu-IN`) instead of generic robotic fallbacks.
+- **Indian English Fallback**: Defaults English text to Indian English (`en-IN`) for a more relatable, localized student experience.
+- **Pedagogical Impact**: Drastically improves accessibility and comprehension for ESL (English as a Second Language) students across India. Hearing complex STEM concepts explained aloud in their native tongue lowers cognitive load and improves retention.
+
+---
+
 ## License
 
 Distributed under the MIT License. See `LICENSE` for more details.
