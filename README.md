@@ -70,6 +70,10 @@ CampusCircle is structured as a high-performance monorepo:
 - **Interactive Controls**: MANDATORY HTML range sliders (`<input type="range">`) driving real-time JavaScript updates on SVG vectors and dynamic formula readouts.
 - **Performance Caching & Rate Limiting**: Features a 5 visual/day rate limiter (`reva_visual_rate_limits`) and pre-rendered query cache (`reva_visual_cache`) for instant repeat loads.
 
+
+
+
+
 ### 2. Multi-Key & Multi-Model AI Resilience
 - **Round-Robin Key Rotation**: Configurable `GROQ_API_KEYS_POOL` automatically rotates API requests across multiple Groq developer accounts to eliminate 429 rate limit errors.
 - **4-Pass Model Fallback Cascade**: If the primary model fails or is rate-limited, requests automatically fallback through:
