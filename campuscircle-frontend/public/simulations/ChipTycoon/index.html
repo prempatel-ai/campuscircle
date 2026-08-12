@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ChipTycoon: How a Computer Chip Is Made</title>
+<meta name="description" content="A guided isometric tour of a chip factory. A cart carries one wafer from a pile of sand to a finished chip, then a lorry delivers the chips to a data centre, stopping at all twenty two stages along the way." />
+<link rel="stylesheet" href="css/styles.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%232f3945'/%3E%3Crect x='9' y='9' width='14' height='14' rx='2' fill='%233fb5a0'/%3E%3C/svg%3E" />
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div id="tooltip" class="tooltip" hidden></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo" aria-hidden="true"></div>
+    <div class="brand-text">
+      <h1>Chip<span>Tycoon</span></h1>
+    </div>
+  </div>
+  <div class="top-actions">
+    <button id="btn-about" class="btn">About</button>
+    <button id="btn-panel" class="btn" aria-expanded="true">Hide guide</button>
+  </div>
+</header>
+
+<div class="hud" id="hud">
+  <div class="hud-item"><span class="k">Stops seen</span><span class="v" id="ui-hudStop">0 / 22</span></div>
+  <div class="hud-item"><span class="k">Layer</span><span class="v" id="ui-hudLayer">1 of 4</span></div>
+  <div class="hud-item"><span class="k">Wafer</span><span class="v" id="ui-hudBatch">#1</span></div>
+  <div class="hud-note" id="ui-hudNote"></div>
+</div>
+
+<div class="zoomer">
+  <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+  <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+  <button id="zoom-fit" title="Show the whole park (or double-click)" aria-label="Fit the whole park">⤢</button>
+</div>
+
+<aside class="guide" id="guide">
+  <!-- On a phone the guide is a bottom sheet: the head stays visible and
+       everything below the handle collapses, so the park is never buried. -->
+  <button class="sheet-handle" id="sheet-handle" aria-expanded="false" aria-controls="guide-more">
+    <span class="grip" aria-hidden="true"></span>
+    <span class="sheet-label">Read more</span>
+    <span class="sheet-caret" aria-hidden="true">▾</span>
+  </button>
+
+  <div class="stop-head">
+    <div class="eyebrow">
+      <span class="chip act1" id="ui-chip">Stop 1 of 22</span>
+    </div>
+    <h2 id="ui-name">Sand Pit</h2>
+    <p class="lede" id="ui-short"></p>
+
+    <div class="dwell" id="ui-dwell" hidden>
+      <div class="track"><i id="ui-dwellBar"></i></div>
+      <span id="ui-dwellHint"></span>
+    </div>
+  </div>
+
+  <div class="guide-more" id="guide-more">
+    <p class="body" id="ui-body"></p>
+    <p class="tip" id="ui-tip"></p>
+
+    <div class="pin-note" id="ui-pinNote" hidden>
+      Pinned to this stop.
+      <button id="btn-unpin" class="link">Follow the cart again</button>
+    </div>
+
+    <section class="sec">
+      <h3>The whole route <span class="hint">click any stop to ride there</span></h3>
+      <div class="stop-list" id="ui-stopList"></div>
+    </section>
+
+    <section class="sec">
+      <h3>What you are watching</h3>
+      <p class="fine">The yellow cart carries one wafer, and the tag above it names whatever
+        it is carrying right now. The cargo changes at every single stop: sand, rough silicon,
+        white polysilicon, a silver crystal, a stack of slices, a mirror-flat disc, then a
+        coloured layer that is coated, printed, etched, doped and wired. Each lap of the ring
+        adds another plate to the stack, so you can watch the chip being built up one layer at
+        a time before the saw cuts it into separate dies. At the loading dock the cart hands
+        the boxed chips to a lorry, which drives them out to the data centre on the east side
+        of the park. Another hall of racks lights up with every delivery, and then the lorry
+        drives back to the gate and the next wafer starts.</p>
+    </section>
+  </div>
+</aside>
+
+<footer class="dock" id="dock">
+  <div class="progress"><i id="ui-progressBar"></i></div>
+  <div class="dock-row">
+    <div class="group">
+      <button id="btn-play" class="icon" title="Play or pause (Space)"><span id="ui-playGlyph">❙❙</span></button>
+      <button id="btn-step" class="icon" title="Skip to the next stop (S)">⇥</button>
+      <button id="btn-restart" class="icon" title="Restart the guided tour (R)">⟲</button>
+    </div>
+
+    <label class="field slider">
+      <span>Speed <b id="v-speed">1.0×</b></span>
+      <input id="speed" type="range" min="0.4" max="6" step="0.1" value="1" />
+    </label>
+
+    <div class="group toggles">
+      <label class="toggle"><input id="follow" type="checkbox" checked /><span>Follow</span></label>
+      <label class="toggle"><input id="labels" type="checkbox" checked /><span>Signs</span></label>
+    </div>
+  </div>
+</footer>
+
+<div class="modal" id="about" hidden>
+  <div class="modal-card">
+    <button class="modal-close" id="about-close" aria-label="Close">×</button>
+    <h2>What this is</h2>
+    <p>ChipTycoon is a working chip factory laid out as a theme park. A cart carries one
+      silicon wafer along the roads and stops at each of the twenty buildings that turn
+      ordinary sand into a computer chip. The cargo on the cart is the wafer itself, and it
+      visibly changes at every stop, so you can always see what stage the material is at.
+      Two more stops follow the chips out of the gate: they are palletised onto a lorry at
+      the loading dock and delivered to the data centre, where they are racked up and
+      switched on. Then the lorry drives back and the whole thing runs again.</p>
+
+    <h2>Why the middle is a ring</h2>
+    <p>Making a chip is not carving or assembling. It is printing. A pattern is projected
+      onto the wafer with light through a photo mask, carved into a solid layer, and then the whole thing happens
+      again for the next layer up. A real chip is about sixty of those layers stacked on top
+      of each other, which is why the cart drives the same six buildings round and round.
+      The park shows four laps and then moves on, so you are not sat there for an hour.</p>
+
+    <h2>Pacing</h2>
+    <p>The first time the cart reaches a stop it waits long enough for you to read that
+      stop's explanation, between 10 and 22 seconds depending on how much there is to say,
+      and a bar under the panel text shows how long is left. Once every stop has been
+      explained there is nothing new to read, so the park speeds up to a watchable pace. The guided first pass takes about nine minutes.
+      <b>Space</b> holds any stop for as long as you like, <b>S</b> skips to the next one, and
+      the speed slider scales everything, reading stops included.</p>
+
+    <h2>Controls</h2>
+    <ul>
+      <li><b>Space</b> play or pause · <b>S</b> next stop · <b>R</b> restart the tour ·
+          <b>F</b> follow camera · <b>L</b> signs</li>
+      <li>Drag to pan, scroll to zoom, double-click to see the whole park.</li>
+      <li>Click any building for its explanation, or pick a stop from the list in the guide
+          to ride straight there.</li>
+    </ul>
+
+    <h2>How accurate is it</h2>
+    <p>The order of the stages, and what each one physically does, is real: quartz sand,
+      carbon reduction, the Siemens purification, Czochralski crystal growth, wire sawing,
+      polishing, mask making, deposition, photoresist, exposure, develop and etch, ion
+      implantation, copper damascene wiring, wafer probe, dicing, packaging, final sort,
+      and the trays going out on a lorry to the machines that run on them.
+      The numbers quoted are typical rather than exact, since they vary enormously between
+      products. Scaled down for the sake of the ride: four laps instead of about sixty, one
+      wafer instead of a lot moving in parallel, and a park you can walk across in a minute
+      instead of a building the size of several football pitches.</p>
+    <p class="fine">No build step, no dependencies, no network calls. Every shape on screen
+      is drawn from plain polygons in a canvas.</p>
+  </div>
+</div>
+
+<script src="js/iso.js"></script>
+<script src="js/park.js"></script>
+<script src="js/tour.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
