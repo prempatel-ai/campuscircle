@@ -130,6 +130,19 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 </svg>
                 <span>Ask Reva</span>
               </Link>
+              <Link
+                href="/simulate"
+                className={`px-3.5 py-1.5 rounded-full text-xs font-sans transition-all flex items-center gap-1.5 ${
+                  pathname.startsWith("/simulate")
+                    ? "bg-primary/10 text-primary font-bold shadow-2xs"
+                    : "text-ink/75 hover:bg-surface-subtle hover:text-ink font-semibold"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
+                </svg>
+                <span>Simulate (Beta)</span>
+              </Link>
             </nav>
           </div>
 
@@ -375,6 +388,19 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
           </svg>
           <span>Ask Reva</span>
+        </Link>
+        <Link
+          href="/simulate"
+          className={`flex flex-col items-center justify-center gap-1 py-1.5 px-3 min-h-[44px] text-[11px] font-sans transition-all border-t-2 ${
+            pathname.startsWith("/simulate")
+              ? "text-primary font-extrabold border-primary -mt-[2px]"
+              : "text-ink/75 font-semibold border-transparent hover:text-ink"
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
+          </svg>
+          <span>Simulate</span>
         </Link>
 
         <Link
