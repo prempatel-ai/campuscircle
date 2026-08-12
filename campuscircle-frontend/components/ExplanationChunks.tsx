@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import { InteractiveVisual } from "./InteractiveVisual";
+import { useSpeech } from "@/hooks/useSpeech";
+import { Volume2, Square } from "lucide-react";
 
 interface Chunk {
   title: string;
@@ -26,6 +28,7 @@ export function ExplanationChunks({
   onStartQuiz,
 }: ExplanationChunksProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const { speak, currentlySpeaking } = useSpeech();
 
   const currentChunk = chunks[activeIndex] || chunks[0];
 
@@ -88,9 +91,18 @@ export function ExplanationChunks({
             <span className="font-mono text-xs text-primary font-bold">
               PART {activeIndex + 1} OF {chunks.length}
             </span>
-            <span className="text-xs font-sans text-ink/50">
-              Interactive Storytelling Format
-            </span>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => speak(currentChunk.explanation, currentChunk.title)} 
+                className={`p-1.5 rounded-full transition-colors cursor-pointer ${currentlySpeaking === currentChunk.title ? "bg-primary/10 text-primary animate-pulse" : "text-ink/40 hover:text-primary hover:bg-primary/10"}`}
+                title={currentlySpeaking === currentChunk.title ? "Stop Reading" : "Read Aloud"}
+              >
+                {currentlySpeaking === currentChunk.title ? <Square className="w-4 h-4 fill-current" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+              <span className="text-xs font-sans text-ink/50">
+                Interactive Storytelling Format
+              </span>
+            </div>
           </div>
 
           <h2 className="font-display text-lg sm:text-xl font-bold text-ink">

@@ -3,12 +3,13 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Lightbulb, FileText, Code, BrainCircuit } from "lucide-react";
+import { Lightbulb, FileText, Code, BrainCircuit, Mic, Volume2, VolumeX, Square } from "lucide-react";
 import { apiRequest, ApiError } from "@/lib/api";
 import { AnonAvatar } from "@/components/AnonAvatar";
 import { useAuth } from "@/context/AuthContext";
 import { RevaChatSidebar } from "@/components/RevaChatSidebar";
 import { InteractiveVisual } from "@/components/InteractiveVisual";
+import { useSpeech } from "@/hooks/useSpeech";
 
 interface ConversationItem {
   id: string;
@@ -92,6 +93,17 @@ export default function AskRevaPage() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [conversationsError, setConversationsError] = useState<string | null>(null);
   const [isMobileHistoryOpen, setIsMobileHistoryOpen] = useState(false);
+
+  const [isVoiceModeEnabled, setIsVoiceModeEnabled] = useState(false);
+  const [selectedLang, setSelectedLang] = useState("en-US");
+  const { isListening, transcript, startListening, stopListening, speak, stopSpeaking, setTranscript, currentlySpeaking } = useSpeech();
+  
+  // Auto-update input text when transcript changes
+  useEffect(() => {
+    if (isListening && transcript) {
+      setInputText(transcript);
+    }
+  }, [transcript, isListening]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -205,6 +217,11 @@ export default function AskRevaPage() {
 
       const botMsg = toChatMessage(res.reva_message);
       setMessages((prev) => [...prev, botMsg]);
+
+      // Speak response if voice mode is enabled
+      if (isVoiceModeEnabled) {
+        speak(botMsg.text);
+      }
 
       if (res.title) {
         setConversations((prev) =>
@@ -371,6 +388,16 @@ export default function AskRevaPage() {
                             <span className="font-bold uppercase">{isUser ? `@${username}` : "Reva AI"}</span>
                             <span>•</span>
                             <span>{msg.timestamp}</span>
+                            {!isUser && (
+                              <button
+                                type="button"
+                                onClick={() => speak(msg.text, msg.id)}
+                                className={`ml-auto p-1 transition-colors cursor-pointer ${currentlySpeaking === msg.id ? "text-primary animate-pulse" : "hover:text-primary"}`}
+                                title={currentlySpeaking === msg.id ? "Stop Reading" : "Read Aloud"}
+                              >
+                                {currentlySpeaking === msg.id ? <Square className="w-3 h-3 fill-current" /> : <Volume2 className="w-3 h-3" />}
+                              </button>
+                            )}
                           </div>
 
                           {isUser ? (
@@ -473,13 +500,44 @@ export default function AskRevaPage() {
             />
 
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setModelMode(modelMode === "fast" ? "thinking" : "fast")}
-                className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border border-border-muted/60 text-ink/70 hover:text-primary hover:border-primary/40 transition-all"
-              >
-                {modelMode === "fast" ? "Fast" : "Deep Think"}
-              </button>
+                  <select
+                    value={selectedLang}
+                    onChange={(e) => setSelectedLang(e.target.value)}
+                    className="bg-transparent border-none text-xs text-ink/70 font-sans cursor-pointer focus:outline-none appearance-none pr-2"
+                    title="Spoken Language"
+                  >
+                    <option value="en-US">EN</option>
+                    <option value="hi-IN">HI</option>
+                    <option value="gu-IN">GU</option>
+                    <option value="es-ES">ES</option>
+                    <option value="fr-FR">FR</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsVoiceModeEnabled(!isVoiceModeEnabled)}
+                    className={`p-2 rounded-full transition-all ${isVoiceModeEnabled ? "bg-primary/20 text-primary" : "text-ink/40 hover:text-ink/70"}`}
+                    title="Toggle Auto Read Aloud"
+                  >
+                    {isVoiceModeEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => isListening ? stopListening() : startListening(selectedLang)}
+                    className={`p-2 rounded-full transition-all ${isListening ? "bg-red-500/20 text-red-500 animate-pulse" : "text-ink/40 hover:text-ink/70"}`}
+                    title={isListening ? "Click to Stop" : "Click to Speak"}
+                  >
+                    <Mic className="w-4 h-4" />
+                  </button>
+
+                <button
+                  type="button"
+                  onClick={() => setModelMode(modelMode === "fast" ? "thinking" : "fast")}
+                  className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border border-border-muted/60 text-ink/70 hover:text-primary hover:border-primary/40 transition-all"
+                >
+                  {modelMode === "fast" ? "Fast" : "Deep Think"}
+                </button>
 
               <button
                 type="button"
