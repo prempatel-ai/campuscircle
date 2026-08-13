@@ -203,7 +203,7 @@ def get_mock_chunks(language_name: str = "English") -> List[dict]:
 
     return [
         {"title": t1, "explanation": e1, "has_visual": False, "visual_html": None},
-        {"title": t2, "explanation": e2, "has_visual": True, "visual_html": _MOCK_PHYSICS_VISUAL},
+        {"title": t2, "explanation": e2, "has_visual": False, "visual_html": None},
         {"title": t3, "explanation": e3, "has_visual": False, "visual_html": None},
     ]
 
@@ -775,8 +775,8 @@ _MOCK_CHUNKS = [
     {
         "title": "Interactive STEM Simulation & Mechanics",
         "explanation": "Newton's Second Law states that force equals mass times acceleration (F = m * a). Adjust the force and mass sliders below to see how acceleration updates live in real time.",
-        "has_visual": True,
-        "visual_html": _MOCK_PHYSICS_VISUAL,
+        "has_visual": False,
+        "visual_html": None,
     },
     {
         "title": "Core Synthesis & Evaluation",
@@ -817,25 +817,7 @@ async def call_groq_api_for_explanation(
         "You are an expert AI educator. Break down the provided video transcript into "
         "digestible, storytelling-style explanation chunks for a first-time learner. "
         f"MANDATORY LANGUAGE REQUIREMENT: You MUST write ALL titles ('title') and explanations ('explanation') directly in {language_name}. Do NOT output English if {language_name} is Hindi, Spanish, French, or Gujarati.{goal_prompt}{memory_prompt}\n\n"
-        "FOR EACH CHUNK, EVALUATE VISUAL SUITABILITY:\n"
-        "- Decide if an interactive visual simulation (HTML + inline SVG + vanilla JS with controls like sliders or buttons driving live readouts and animated SVG diagram attributes) WOULD MEANINGFULLY HELP teach this specific concept.\n"
-        "- ONLY generate a visual for STEM, physics, math, engineering, algorithms, or data structure concepts where an interactive visual genuinely aids understanding (e.g. force + mass sliders driving a live acceleration readout and animated SVG box, or interactive step visualizer).\n"
-        "- DO NOT force a visual on non-visualizable chunks (e.g. historical background, philosophical context, definitions, introductory summaries). For non-visual chunks, set 'has_visual': false and 'visual_html': null.\n\n"
-        "FOR QUALIFYING CHUNKS (has_visual: true):\n"
-        "- Generate a complete self-contained HTML string in 'visual_html'.\n"
-        "- MANDATORY RULE: This output MUST contain at least one <input type=\"range\"> element for every adjustable variable in the concept. Static buttons are NOT an acceptable substitute for sliders. Output containing only buttons with no range input will be rejected.\n"
-        "- MUST USE CAMPUSCIRCLE DESIGN TOKENS IN INLINE CSS:\n"
-        "  :root { --background: #FAF9F6; --surface: #FFFFFF; --primary: #2F5233; --accent: #E8A33D; --ink: #1C2826; --border: #E2E8F0; }\n"
-        "- MANDATORY TEXT SPACING & FORMATTING: Always place titles, formula labels, and readout values inside visually separate elements (e.g. separate <div> or <span> blocks with proper CSS margins). NEVER concatenate inline text without spaces (e.g. PROHIBITED: 'DemoFormula', 'FormulaReadout').\n"
-        "- MUST MATCH THIS EXACT STRUCTURAL PATTERN:\n"
-        "  1. Continuous range sliders (<input type='range'>) for every adjustable physical/mathematical variable.\n"
-        "  2. An SVG diagram (<svg>) with dynamic attributes or vectors (e.g. moving box, changing arrows/colors).\n"
-        "  3. A live formula readout box displaying exact mathematical equations and correct physical units (e.g. 'a = F / m', 'Acceleration (a): 2.00 m/s²', 'Force: 10 N', 'Mass: 5 kg'). NEVER label force/newtons as acceleration!\n"
-        "  4. Optional push / action / reset buttons.\n"
-        "  5. Plain vanilla JS update functions listening to 'input' events on range sliders.\n\n"
-        "LITERAL WORKING REFERENCE HTML TEMPLATE TO STRUCTURALLY MATCH:\n"
-        f"```html\n{_MOCK_PHYSICS_VISUAL}\n```\n\n"
-        "Return a JSON object with a single top-level key 'chunks' — a list where each item has exact keys: 'title', 'explanation', 'has_visual' (boolean), and 'visual_html' (string or null)."
+        "Return a JSON object with a single top-level key 'chunks' — a list where each item has exact keys: 'title', 'explanation', 'has_visual' (boolean, always false), and 'visual_html' (always null)."
     )
     fallback_models = [settings.groq_model, "llama-3.1-8b-instant", "mixtral-8x7b-32768", "llama3-70b-8192"]
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -875,26 +857,8 @@ async def call_groq_api_for_explanation(
                         except Exception:
                             raw_json_chunks = []
 
-                        needs_quality_retry = False
-                        for idx, r_chunk in enumerate(raw_json_chunks):
-                            if isinstance(r_chunk, dict) and r_chunk.get("has_visual"):
-                                if idx < len(parsed) and not parsed[idx]["has_visual"]:
-                                    needs_quality_retry = True
-                                    break
-
-                        if not needs_quality_retry or attempt >= 2:
+                        if attempt >= 0:
                             return parsed
-
-                        # On attempt 0/1 quality failure, append stricter reminder prompt and retry
-                        payload["messages"].append({"role": "assistant", "content": content_text})
-                        payload["messages"].append({
-                            "role": "user",
-                            "content": (
-                                "QUALITY CHECK FAILED: Your generated visual lacked continuous range sliders (<input type='range'>), "
-                                "an <svg> diagram, or live JS event listeners. Please regenerate the JSON chunks following the "
-                                "REFERENCE STRUCTURAL TEMPLATE with continuous sliders for all variables, an SVG diagram, formula readout, and correct physical units."
-                            )
-                        })
                 else:
                     logger.warning(f"[GROQ EXPLANATION RETRY] Status {res.status_code} on model {current_model} (attempt {attempt + 1})")
                     await asyncio.sleep(1.0)
