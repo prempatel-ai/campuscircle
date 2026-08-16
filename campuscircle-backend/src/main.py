@@ -57,7 +57,7 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 
 
-@app.get("/health", tags=["system"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["system"])
 async def health_check():
     """
     Liveness/readiness check. Hosting platforms (Railway/Render/Fly)
@@ -68,6 +68,6 @@ async def health_check():
     return {"status": "ok", "environment": settings.environment}
 
 
-@app.get("/", tags=["system"])
+@app.api_route("/", methods=["GET", "HEAD"], tags=["system"])
 async def root():
     return {"message": f"{settings.app_name} is running"}
