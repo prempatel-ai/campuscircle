@@ -62,6 +62,16 @@ class Settings(BaseSettings):
             elif self.database_url.startswith("postgresql://") and not self.database_url.startswith("postgresql+asyncpg://"):
                 self.database_url = self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+            # Automatically convert Render internal hostname (dpg-xxxx-a) to external hostname
+            # (dpg-xxxx-a.oregon-postgres.render.com) when running on local PC outside Render
+            import os, re
+            if "@dpg-" in self.database_url and ".render.com" not in self.database_url and not os.environ.get("RENDER"):
+                self.database_url = re.sub(
+                    r'(@dpg-[a-z0-9]+-[a-z0-9]+)([:/])',
+                    r'\1.oregon-postgres.render.com\2',
+                    self.database_url
+                )
+
         if self.environment.lower() == "production":
             if self.jwt_secret == "change-me-in-env-file":
                 raise ValueError("JWT_SECRET must be set to a secure random string in production environment.")
